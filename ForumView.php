@@ -51,8 +51,13 @@ class ForumView
 		if (isset($_REQUEST[AppBase::FORUM_QUOTE])) {
 			$post = $this->helper->getPost($_REQUEST[AppBase::FORUM_QUOTE]);
 			$user = $this->helper->getUserDataFiltered($post["user_id"]);
-			$text = "[quote name=" . $user->display_name . " date=" . date("Y-m-d H:i") . "]" . $post["text"] . "[/quote]";
-			$this->smarty->assign("quote_text", $text);
+
+			$quote_data = array(
+				"text" => "[quote name=" . $user->display_name . " date=" . date("Y-m-d H:i") . "]" . $post["text"] . "[/quote]",
+				"subject" => "Re: ".$thread["subject"],
+			);
+
+			$this->smarty->assign("quote_data", $quote_data);
 		}
 
 		$this->smarty->assign("record", $_REQUEST["record"]);
@@ -73,13 +78,16 @@ class ForumView
 			$nonce = wp_create_nonce("wpforum_ajax_nonce");
 			$buttons = array(
 				AppBase::FORUM_VIEW_ACTION => array(
-					"new_thread" => "<a data-forum-id='" . $this->record . "' class='forum-button new_thread' href='" . ForumHelper::getLink(AppBase::NEW_THREAD_VIEW_ACTION, $this->record) . "'>Start Topic</a>",
+					"new_thread" => "<a data-forum-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::NEW_THREAD_VIEW_ACTION, $this->record) . "'>Start Topic</a>",
 				),
 				AppBase::THREAD_VIEW_ACTION => array(
-					"new_post" => "<a data-thread-id='" . $this->record . "' class='forum-button forum-reply-button' href='" . ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $this->record) . "'>Reply</a>",
+					"new_post" => "<a data-thread-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $this->record) . "'>Reply</a>",
 					//"subscribe_rss" => "<a class='forum-button subscribe_rss' href='" . ForumHelper::getLink(AppBase::RSS_POST_ACTION, $this->record) . "'>RSS Feed</a>",
 					//"subscribe_email" => "<a class='forum-button subscribe_email' href='" . ForumHelper::getLink(AppBase::EMAIL_POST_ACTION, $this->record) . "'>Email Subscription</a>"
 				),
+				AppBase::MAIN_VIEW_ACTION => array(),
+				AppBase::NEW_THREAD_VIEW_ACTION => array(),
+				AppBase::NEW_POST_VIEW_ACTION => array()
 			);
 
 			switch ($this->action) {
@@ -87,9 +95,9 @@ class ForumView
 					$thread = $this->helper->getThread($this->record);
 					if ($current_user_id == $thread["user_id"]) {
 						if ($thread["is_question"] && !$thread["is_solved"]) {
-							$buttons[$this->action]["mark_solved"] = "<a data-nonce='$nonce' data-thread-id='$this->record' class='marksolved' href='javascript:void(0)'>Mark question solved</a>";
+							$buttons[$this->action]["mark_solved"] = "<a data-nonce='$nonce' data-thread-id='$this->record' class='' href='javascript:void(0)'>Mark question solved</a>";
 						}
-						if ($thread["is_solved"] or $thread["status"] == "closed") {
+						if ($thread["status"] == "closed") {
 							unset($buttons[$this->action]["new_post"]);
 						}
 					}
@@ -99,8 +107,8 @@ class ForumView
 		} else {
 			$url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
 			$this->smarty->assign("buttons", array(
-				"login" => "<a href='" . wp_login_url($url) . "'>Login</a>",
-				"signup" => "<a href='" . wp_registration_url() . "'>Sign Up</a>",
+				"login" => "<a class='' href='" . wp_login_url($url) . "'>Login</a>",
+				"signup" => "<a class='' href='" . wp_registration_url() . "'>Sign Up</a>",
 			));
 		}
 	}
@@ -128,9 +136,6 @@ class ForumView
 	public function getForumView()
 	{
 		$threads = $this->helper->getThreadsInForum($this->record, $this->offset);
-		if (!$threads) {
-			$this->_exit();
-		}
 		$this->smarty->assign("data", $threads);
 		return $this->smarty->fetch($this->template_dir . "/threads.tpl");
 	}
@@ -143,9 +148,6 @@ class ForumView
 	public function getTopicView()
 	{
 		$posts = $this->helper->getPostsInThread($this->record, $this->offset);
-		if (!$posts) {
-			self::_exit();
-		}
 		$this->helper->updateThreadViewCount($this->record);
 		$this->smarty->assign("data", $posts);
 		return $this->smarty->fetch($this->template_dir . "/posts.tpl");
@@ -154,7 +156,7 @@ class ForumView
 	public static function _exit($msg = "")
 	{
 		wp_die("
-			<h2>Oops...</h2>
+			<h1>Oops...</h1>
 			<p>The requested forum resource was not found.<br>
 			Please take a look at the forum main page or do a search</p>
 
@@ -173,9 +175,6 @@ class ForumView
 	public function getMainView()
 	{
 		$cats = $this->helper->getCategories();
-		if (!$cats) {
-			self::_exit();
-		}
 		$this->smarty->assign("data", $cats);
 		return $this->smarty->fetch($this->template_dir . "/main.tpl");
 	}

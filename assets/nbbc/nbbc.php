@@ -874,7 +874,7 @@ class BBCodeLibrary
 		else $title = htmlspecialchars(trim($default)) . " wrote:";
 		return "\n<div class=\"bbcode_quote\">\n<div class=\"bbcode_quote_head\">"
 		. $title . "</div>\n<div class=\"bbcode_quote_body\">"
-		. $content . "</div>\n</div>\n";
+		. "<p>".$content . "</p></div>\n</div>\n";
 	}
 
 	function DoList($bbcode, $action, $name, $default, $params, $content)

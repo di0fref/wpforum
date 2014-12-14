@@ -42,7 +42,7 @@ class ForumHelper
 	{
 		global $wpdb;
 		$additional_sql = "";
-		if($post_id){
+		if ($post_id) {
 			$additional_sql = " ,solved_post_id = '$post_id'";
 		}
 		$sql = "UPDATE " . AppBase::$threads_table . " SET is_solved = '1' $additional_sql WHERE id = '$record'";
@@ -122,7 +122,7 @@ class ForumHelper
 				break;
 		}
 
-		return implode(AppBase::TRAIL_SEPARATOR, $result);
+		return "<ol class='breadcrumb'><li>" . implode("</li><li>", $result) . "</li></ol>";
 	}
 
 	/*
@@ -176,24 +176,22 @@ class ForumHelper
 		$thread = $this->getThread($record);
 		foreach ($posts["posts"] as &$post) {
 			$post["text"] = $this->outPutFilter($post["text"]);
-			$post["avatar"] = get_avatar($post["user_id"], 65);
 			$post["user"] = $this->getUserDataFiltered($post["user_id"]);
+			$post["avatar"] = $this->getAvatar($post["user"]->user_email, 65);
 
 			if (!in_array($thread["status"], array("closed")) and $thread["user_id"] == get_current_user_id()) {
 				$post["post_links"] = array(
 					"edit" => array(
-						"href" => "#",
-						"text" => "Edit",
+						"link" => "<i class='fa fa-edit fa-fw'></i><a href='javascipt:void(0)'>&nbsp;Edit</a>",
 					),
 					"solve_post" => array(
-						"href" => "<a data-nonce='$nonce' data-post-id='".$post["id"]."' data-thread-id='$record' class='marksolved' href='javascript:void(0)'>Mark question solved by this post</a>",
+						"link" => "<i class='fa fa-check fa-fw'></i><a data-nonce='$nonce' data-post-id='" . $post["id"] . "' data-thread-id='$record' class='marksolved' href='javascript:void(0)'>&nbsp;Mark question solved by this post</a>",
 					),
 					"quote" => array(
-						"href" => ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $record, array(AppBase::FORUM_QUOTE, $post["id"])),
-						"text" => "Reply With Quote",
+						"link" =>"<i class='fa fa-quote-right fa-fw'></i><a href='".ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $record, array(AppBase::FORUM_QUOTE, $post["id"]))."'>&nbsp;Quote</a>",
 					),
 				);
-				if(!$thread["is_question"] or $thread["is_solved"]){
+				if (!$thread["is_question"] or $thread["is_solved"]) {
 					unset($post["post_links"]["solve_post"]);
 				}
 			}
@@ -203,7 +201,8 @@ class ForumHelper
 		$posts["header"] = $subject;
 		$posts["prefix"] = $this->getThreadPrefix($thread);
 		$posts["thread_starter_id"] = $thread["user_id"];
-		if(!empty($thread["solved_post_id"])){
+		$posts["icon"] = self::getPng($thread);
+		if (!empty($thread["solved_post_id"])) {
 			$solved_post = $this->getPost($thread["solved_post_id"]);
 			$solved_user = $this->getUserDataFiltered($solved_post["user_id"]);
 			$posts["solved_post_id"] = $thread["solved_post_id"];
@@ -219,7 +218,7 @@ class ForumHelper
 
 	function outPutFilter($string)
 	{
-		return stripslashes($this->bb_parser->Parse($string));
+		return wpautop(stripslashes($this->bb_parser->Parse($string)));
 	}
 
 	/*
@@ -228,13 +227,14 @@ class ForumHelper
 	*/
 	public function getCategories()
 	{
-		$sql = "SELECT * FROM " . AppBase::$categories_table . " order by name";
+		$sql = "SELECT * FROM " . AppBase::$categories_table . " order by sort_order";
 		$categories = $this->db->get_results($sql, ARRAY_A);
 
 		if (!$categories) {
 			return false;
 		}
 		foreach ($categories as &$category) {
+			$category["forums"] = array();
 			foreach ($this->getForumsInCategory($category["id"]) as $forum) {
 				$forum["href"] = self::getLink(AppBase::FORUM_VIEW_ACTION, $forum["id"]);
 				$category["forums"][] = $forum;
@@ -250,15 +250,16 @@ class ForumHelper
 	*/
 	public function getForumsInCategory($category_id)
 	{
-		$sql = "select f.id, f.name, f.description, max(p.date) as last_post, count(distinct(p.id)) as post_count, count(distinct(t.id)) as thread_count from " . AppBase::$forums_table . " f
+		$sql = "select f.sort_order, f.id, f.name, f.description, max(p.date) as last_post, count(distinct(p.id)) as post_count, count(distinct(t.id)) as thread_count from " . AppBase::$forums_table . " f
 					left join " . AppBase::$threads_table . " t on t.parent_id = f.id
 						left join " . AppBase::$posts_table . " p on p.parent_id = t.id
 						where f.parent_id = '{$category_id}'
-				group by f.id;";
+				group by f.id order by f.sort_order";
 		$result = $this->db->get_results($sql, ARRAY_A);
 		if (!$result) {
-			return false;
+			return array();
 		}
+
 		return $result;
 	}
 
@@ -273,7 +274,7 @@ class ForumHelper
 		$sql = "select t.*, count(distinct(p.id))-1 as post_replies, max(p.date) as last_post from " . AppBase::$threads_table . " t
 			left join " . AppBase::$posts_table . " p on t.id = p.parent_id
 				where t.parent_id = '$forum_id'
-			group by t.id order by (status = 'sticky') DESC, last_post DESC $limit_query ";
+			group by t.id order by (status = 'sticky') DESC, last_post DESC $limit_query";
 		$threads = $this->db->get_results($sql, ARRAY_A);
 		if (!$threads) {
 			return false;
@@ -284,25 +285,42 @@ class ForumHelper
 			$thread["icon"] = self::getPng($thread);
 			$thread["user"] = $this->getUserDataFiltered($thread["user_id"]);
 			$thread["last_poster"] = $this->lastPoster($thread["id"]);
-			$thread["last_poster"]["avatar"] = get_avatar($thread["last_poster"]["user_email"], 22);
+			$thread["last_poster"]["avatar"] = $this->getAvatar($thread["last_poster"]["user_email"], 22);
 			$thread["prefix"] = $this->getThreadPrefix($thread);
 		}
+
 		return $threads;
+	}
+
+	function getAvatar($email, $size)
+	{
+		$default = "";
+		/* Check if we are using ssl */
+		if (is_ssl()) {
+			$host = 'https://secure.gravatar.com';
+		} else {
+			$host = "http://www.gravatar.com";
+		}
+		$grav_url = "$host/avatar/" . md5(strtolower(trim($email))) . "?d=" . urlencode($default) . "&s=" . $size;
+
+		$avtar_img = "<img class='avatar' src='$grav_url' height='$size' width='$size'>";
+
+		return $avtar_img;
 	}
 
 	function getThreadPrefix(array $thread)
 	{
 		$prefix = "";
 		if ($thread["is_solved"]) {
-			$prefix = "<span class='forum-solved-prefix'>[Solved]</span> ";
+			$prefix = "<span class='forum-solved-prefix'>Solved</span>";
 		}
 		if ($thread["status"] == "sticky") {
-			$prefix = "<span class='forum-sticky-prefix'>[Sticky]</span> ";
+			$prefix = "<span class='forum-sticky-prefix'>Sticky</span>";
 		}
 		if ($thread["status"] == "closed") {
-			$prefix = "<span class='forum-closed-prefix'>[Closed]</span> ";
+			$prefix = "<span class='forum-closed-prefix'>Closed</span>";
 		}
-		return $prefix;
+		return empty($prefix) ? "" : $prefix . ": &nbsp;";
 	}
 
 
@@ -320,7 +338,7 @@ class ForumHelper
 
 	public function getCategory($id)
 	{
-		$sql = "select name, id from " . AppBase::$categories_table . " where id = '{$id}'";
+		$sql = "select * from " . AppBase::$categories_table . " where id = '{$id}'";
 		return $this->db->get_row($sql, ARRAY_A);
 	}
 
@@ -429,6 +447,83 @@ class ForumHelper
 		$sql = "SELECT max(nr) from " . AppBase::$posts_table . " WHERE parent_id = '$thread_id'";
 		return $wpdb->get_var($sql) + 1;
 
+	}
+
+	public static function add_category($name, $description, $sort_order)
+	{
+		global $wpdb;
+		$id = create_guid();
+
+		$sql = "INSERT INTO " .
+			AppBase::$categories_table . "
+				(id, name, description, sort_order)
+				VALUES('$id','$name','$description','$sort_order')";
+
+		return $wpdb->query($sql);
+	}
+
+	public static function add_forum($name, $description, $sort_order, $category_id)
+	{
+		global $wpdb;
+		$id = create_guid();
+		$sql = "INSERT INTO " .
+			AppBase::$forums_table . "
+				(id, name, description, sort_order, parent_id)
+				VALUES('$id','$name','$description','$sort_order','$category_id')";
+
+		return $wpdb->query($sql);
+	}
+
+
+	public static function update_category($id, $name, $description, $sort_order)
+	{
+		global $wpdb;
+
+		$sql = "UPDATE " . AppBase::$categories_table .
+			" SET
+			name='$name',
+			description='$description',
+			sort_order='$sort_order'
+			WHERE id='$id'";
+
+
+		return $wpdb->query($sql);
+	}
+
+	public static function update_forum($id, $name, $description, $sort_order, $parent_id)
+	{
+		global $wpdb;
+		$sql = "UPDATE " . AppBase::$forums_table . "
+		SET
+			name='$name',
+			description='$description',
+			sort_order='$sort_order',
+			parent_id='$parent_id'
+			WHERE id='$id'
+		";
+
+		return $wpdb->query($sql);
+	}
+
+	function getCatDD($selected)
+	{
+		$cats = $this->getCategories();
+
+		$dd = "<select name='category_id'>";
+		$dd .= "<option></option>";
+
+		foreach ($cats as $cat) {
+			$s = "";
+			if($cat["id"] == $selected){
+				$s = "selected";
+			}
+
+			$dd .= "<option $s value='{$cat["id"]}'>{$cat["name"]}</option>";
+		}
+
+		$dd .= "</select>";
+
+		return $dd;
 	}
 }
 

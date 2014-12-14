@@ -8,6 +8,7 @@ define('WPFDIR', dirname(plugin_basename(__FILE__)));
 define('WPFPATH', WP_CONTENT_DIR . '/plugins/' . WPFDIR . '/');
 define('WPFURL', WP_CONTENT_URL . '/plugins/' . WPFDIR . '/');
 
+
 /*
 * Class:
 * Author: Fredrik Fahlstad
@@ -29,6 +30,7 @@ class AppBase
 	const RSS_POST_ACTION = "rss_feed";
 	const EMAIL_POST_ACTION = "email_sub";
 	const MARK_SOLVED_ACTION = "marksolved";
+	const MAIN_VIEW_ACTION = "main";
 
 	const RECORD = "record";
 	const APP_ACTION = "action";
@@ -39,7 +41,7 @@ class AppBase
 	const FORUM_QUOTE = "quote";
 	const FORUM_POST = "fpost";
 
-	const TRAIL_SEPARATOR = " &rarr; ";
+	const TRAIL_SEPARATOR = " / ";
 	const WPFORUM_INSERT_NONCE = "wpforum_insert_nonce";
 
 	/* Options */
@@ -70,6 +72,7 @@ class AppBase
 		self::$posts_table = $table_prefix . self::POSTS;
 		self::$users_table = $table_prefix . self::USERS;
 		//self::$users_threads_table = $table_prefix . self::USERS_THREADS;
+
 	}
 
 	public static $defined_actions = array(
@@ -99,6 +102,9 @@ class AppBase
 
 		if (isset($_REQUEST[self::APP_ACTION])) {
 			$this->action = $_REQUEST[self::APP_ACTION];
+		}
+		else{
+			$this->action = self::MAIN_VIEW_ACTION;
 		}
 		if (isset($_REQUEST[self::RECORD])) {
 			$this->record = $_REQUEST[self::RECORD];
@@ -131,9 +137,10 @@ class AppBase
 			case self::NEW_POST_VIEW_ACTION:
 				$data = $view->getNewPostView();
 				break;
-			default:
+			case self::MAIN_VIEW_ACTION:
 				$data = $view->getMainView();
 				break;
+			default: wp_die("Error!");
 		}
 
 		$header = $this->getHeader();
@@ -191,7 +198,7 @@ class AppBase
 		switch ($type) {
 			case "guid":
 				if (!is_guid($parm) and !is_numeric($parm)) {
-					ForumView::_exit();
+					wp_die("Input error, please try again.");
 				}
 				return true;
 				break;
@@ -199,7 +206,7 @@ class AppBase
 
 		$regexp = "/^([+-]?((([0-9]+(\.)?)|([0-9]*\.[0-9]+))([eE][+-]?[0-9]+)?))$/";
 		if (!preg_match($regexp, $parm))
-			ForumView::_exit("");
+			wp_die("Input error, please try again.");
 	}
 
 
@@ -224,6 +231,7 @@ class AppBase
 			  `name` varchar(255) NOT NULL default '',
 			  parent_id varchar(36) NOT NULL default '',
 			  description varchar(255) NOT NULL default '',
+			  sort int(11) default 0,
 			  PRIMARY KEY  (id),
 			  INDEX parent_idx (parent_id)
 			);";
@@ -240,6 +248,7 @@ class AppBase
 			  is_solved bool default 0,
 			  solved_post_id varchar(36)  default '',
 			  user_id int(11) NOT NULL,
+			  sort int(11) default 0,
 			  PRIMARY KEY  (id),
 			  INDEX parent_idx (parent_id),
 			  INDEX user_idx (user_id)
@@ -277,6 +286,7 @@ class AppBase
 		dbDelta($threads_sql);
 		dbDelta($posts_sql);
 		//dbDelta($user_read);
+
 	}
 
 	/*
@@ -296,25 +306,28 @@ class AppBase
 	{
 		wp_register_style('wpforum_styles', plugins_url('assets/styles/style.css', __FILE__), array(), '', 'all');
 		wp_register_style('jquery_ui_styles', plugins_url('assets/js/jquery-ui/jquery-ui.min.css', __FILE__), array(), '', 'all');
-		wp_register_style('wpforum_editor_bbcode_styles', plugins_url('assets/js/markitup/sets/bbcode/style.css', __FILE__), array(), '', 'all');
-		wp_register_style('wpforum_editor_default_styles', plugins_url('assets/js/markitup/skins/markitup/style.css', __FILE__), array(), '', 'all');
+		wp_register_style('wpforum_bootstrap_styles', plugins_url('assets/bootstrap-3.0.3/css/bootstrap.min.css', __FILE__), array(), '', 'all');
+		wp_register_style('wpforum_bootstrap_styles_theme', plugins_url('assets/bootstrap-3.0.3/css/bootstrap-theme.min.css', __FILE__), array(), '', 'all');
+		wp_register_style('wpforum_font_awsome', plugins_url('assets/font-awesome/css/font-awesome.min.css', __FILE__), array(), '', 'all');
 
 		wp_enqueue_style('wpforum_styles');
+		wp_enqueue_style('wpforum_bootstrap_styles');
+		wp_enqueue_style('wpforum_bootstrap_styles_theme');
 		wp_enqueue_style('jquery_ui_styles');
-		wp_enqueue_style('wpforum_editor_bbcode_styles');
-		wp_enqueue_style('wpforum_editor_default_styles');
+		wp_enqueue_style('wpforum_font_awsome');
+
 
 		wp_register_script('jquery_ui_js', plugins_url('assets/js/jquery-ui/jquery-ui.min.js', __FILE__), array("jquery"), '', false);
 		wp_register_script('wpforum_script', plugins_url('assets/js/forum.js', __FILE__), array("jquery"), '', false);
-		wp_register_script('wpforum_editor_js', plugins_url('assets/js/markitup/jquery.markitup.js', __FILE__), array("jquery"), '', false);
-		wp_register_script('wpforum_editor_set_js', plugins_url('assets/js/markitup/sets/bbcode/set.js', __FILE__), array("jquery"), '', false);
 		wp_register_script('jquery_validate_js', plugins_url('assets/js/jquery.validate.min.js', __FILE__), array("jquery"), '', false);
+		wp_register_script('wpforum_bootstrap', plugins_url('assets/bootstrap-3.0.3/js/bootstrap.min.js', __FILE__), array("jquery"), '', false);
 
-		wp_enqueue_script('wpforum_editor_js');
-		wp_enqueue_script('wpforum_editor_set_js');
 		wp_enqueue_script('wpforum_script');
 		wp_enqueue_script('jquery_ui_js');
 		wp_enqueue_script('jquery_validate_js');
+		wp_enqueue_script('wpforum_bootstrap');
+
+
 
 		wp_localize_script('wpforum_script', 'forumAjax', array('ajaxurl' => admin_url('admin-ajax.php')));
 
