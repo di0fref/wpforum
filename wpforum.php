@@ -56,8 +56,11 @@ function wpforum_admin_process_form()
 	wp_redirect(admin_url('admin.php?page=wpforum-submenu-manage'));
 }
 
-function wpforum_admin_enqueue_scripts()
+function wpforum_admin_enqueue_scripts($hook_suffix)
 {
+	if(strpos($hook_suffix, "wpforum") === false){
+		return;
+	}
 	wp_register_script('wpforum_admin_validate', plugins_url('assets/js/jquery.validate.min.js', __FILE__), array("jquery.validate"), '', false);
 	wp_register_script('wpforum_admin_js', plugins_url('admin/wpforum_admin.js', __FILE__), array("jquery"), '', false);
 	wp_enqueue_script('wpforum_admin_js');
