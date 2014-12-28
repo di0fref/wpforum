@@ -21,16 +21,47 @@ class WPForumAjax
 
 	function marksolved()
 	{
-		if (!wp_verify_nonce($_REQUEST['nonce'], "wpforum_ajax_nonce")) {
-			exit("No naughty business please");
-		}
+		$this->checkInput();
 		AppBase::checkParams($_REQUEST[AppBase::RECORD], "guid");
 		$post_id = "";
-		if(isset($_REQUEST[AppBase::FORUM_POST])){
+		if (isset($_REQUEST[AppBase::FORUM_POST])) {
 			AppBase::checkParams($_REQUEST[AppBase::FORUM_POST], "guid");
 			$post_id = $_REQUEST[AppBase::FORUM_POST];
 		}
 		$result = ForumHelper::markSolved($_REQUEST[AppBase::RECORD], $post_id);
+		$response = array(
+			"affected_rows" => $result,
+		);
+		die(json_encode($response));
+	}
+
+	function closethread()
+	{
+		$this->checkInput();
+		AppBase::checkParams($_REQUEST[AppBase::RECORD], "guid");
+		$result = ForumHelper::closeThread($_REQUEST[AppBase::RECORD]);
+		$response = array(
+			"affected_rows" => $result,
+		);
+		die(json_encode($response));
+	}
+
+	function deletepost()
+	{
+		$this->checkInput();
+		AppBase::checkParams($_REQUEST[AppBase::RECORD], "guid");
+		$result = ForumHelper::deletePost($_REQUEST[AppBase::RECORD]);
+		$response = array(
+			"affected_rows" => $result,
+		);
+		die(json_encode($response));
+	}
+
+	function deletethread()
+	{
+		$this->checkInput();
+		AppBase::checkParams($_REQUEST[AppBase::RECORD], "guid");
+		$result = ForumHelper::deleteThread($_REQUEST[AppBase::RECORD]);
 		$response = array(
 			"affected_rows" => $result,
 		);
@@ -43,4 +74,5 @@ class WPForumAjax
 			exit("No naughty business please");
 		}
 	}
+
 }

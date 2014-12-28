@@ -31,7 +31,7 @@ function smarty_modifier_timesince($string, $uc_digits = false, $lc_rest = false
 	$since = $today - $string;
 
 	if ($since > 604800) {
-		$print = date("M jS", $string);
+		$print = strftime(get_option(AppBase::OPTION_DATE_FORMAT), $string);
 
 		if ($since > 31536000) {
 			$print .= ", " . date("Y", $string);

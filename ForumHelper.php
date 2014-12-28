@@ -14,7 +14,7 @@ class ForumHelper
 	public $db;
 	protected static $_instance;
 
-	protected $bb_parser;
+	public $bb_parser;
 
 	public static function getInstance()
 	{
@@ -35,17 +35,60 @@ class ForumHelper
 	public static function input_filter($string)
 	{
 		global $wpdb;
-		return strip_tags($wpdb->escape($string));
+		return strip_tags(esc_sql($string));
 	}
 
 	public static function markSolved($record, $post_id = "")
 	{
 		global $wpdb;
+
+		$thread = self::getInstance()->getThread($record);
+		if ($thread["user_id"] != get_current_user_id()) {
+			die("");
+		}
 		$additional_sql = "";
 		if ($post_id) {
 			$additional_sql = " ,solved_post_id = '$post_id'";
 		}
 		$sql = "UPDATE " . AppBase::$threads_table . " SET is_solved = '1' $additional_sql WHERE id = '$record'";
+		$result = $wpdb->query($sql);
+		return $result;
+	}
+
+	public static function deletePost($record)
+	{
+		if (current_user_can('manage_options')) {
+			global $wpdb;
+			$sql = "DELETE FROM " . AppBase::$posts_table . "  WHERE id = '$record'";
+			$result = $wpdb->query($sql);
+			return $result;
+		}
+		die("");
+	}
+
+	public static function deleteThread($record)
+	{
+		if (current_user_can('manage_options')) {
+			global $wpdb;
+			$sql = "DELETE FROM " . AppBase::$threads_table . "  WHERE id = '$record'";
+			$result = $wpdb->query($sql);
+
+			$sql = "DELETE FROM " . AppBase::$posts_table . " WHERE parent_id = '$record'";
+			$result = $wpdb->query($sql);
+
+			return $result;
+		}
+		die("");
+	}
+
+	public static function closeThread($record)
+	{
+		global $wpdb;
+		$thread = self::getInstance()->getThread($record);
+		if ($thread["user_id"] != get_current_user_id()) {
+			die("");
+		}
+		$sql = "UPDATE " . AppBase::$threads_table . " SET status = 'closed'  WHERE id = '$record'";
 		$result = $wpdb->query($sql);
 		return $result;
 	}
@@ -143,7 +186,7 @@ class ForumHelper
 			$link_base[$additional_params[0]] = $additional_params[1];
 		}
 
-		return get_permalink() . $delim . http_build_query($link_base);
+		return urldecode(get_permalink() . $delim . http_build_query($link_base));
 	}
 
 	/*
@@ -160,13 +203,37 @@ class ForumHelper
 		}
 	}
 
+	function getPostsInThreadforRSS($thread_id)
+	{
+		$sql = "SELECT p.* FROM " . AppBase::$posts_table . " p left join " . AppBase::$threads_table . " t on t.id = p.parent_id WHERE p.parent_id='$thread_id' order by date limit 10";
+		$url = "http" . (($_SERVER['SERVER_PORT'] == 443) ? "s://" : "://") . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+
+		$data = array(
+			"site_permalink" => site_url(),
+			"site_title" => get_bloginfo("name"),
+			"url" => htmlentities($url),
+			"description" => get_bloginfo("description"),
+		);
+
+		$data["posts"] = $this->db->get_results($sql, ARRAY_A);
+		foreach ($data["posts"] as &$post) {
+			$post["text"] = $this->outPutFilter($post["text"]);
+			$post["date"] = date("D, d M Y H:i:s T", strtotime($post["date"]));;
+			$post["user"] = $this->getUserDataFiltered($post["user_id"]);
+			$post["avatar"] = $this->getAvatar($post["user"]->user_email, 22);
+			$post["permalink"] = htmlentities($this->getLink(AppBase::POST_VIEW_ACTION, $post["id"]));
+		}
+
+		return $data;
+	}
+
 	/*
 	* @param
 	* @return
 	*/
 	public function getPostsInThread($record, $offset)
 	{
-		$limit_query = "LIMIT $offset," . AppBase::POST_PAGE_COUNT;
+		$limit_query = "LIMIT $offset," . get_option(AppBase::OPTION_POSTS_VIEW_COUNT);
 		$nonce = wp_create_nonce("wpforum_ajax_nonce");
 		$sql = "SELECT p.*, t.subject as thread_subject FROM " . AppBase::$posts_table . " p left join " . AppBase::$threads_table . " t on t.id = p.parent_id WHERE p.parent_id='$record' order by date $limit_query";
 		$posts["posts"] = $this->db->get_results($sql, ARRAY_A);
@@ -178,23 +245,34 @@ class ForumHelper
 			$post["text"] = $this->outPutFilter($post["text"]);
 			$post["user"] = $this->getUserDataFiltered($post["user_id"]);
 			$post["avatar"] = $this->getAvatar($post["user"]->user_email, 65);
+			$post["post_links"] = array();
 
-			if (!in_array($thread["status"], array("closed")) and $thread["user_id"] == get_current_user_id()) {
-				$post["post_links"] = array(
-					"edit" => array(
-						"link" => "<i class='fa fa-edit fa-fw'></i><a href='javascipt:void(0)'>&nbsp;Edit</a>",
-					),
-					"solve_post" => array(
+			if ((!in_array($thread["status"], array("closed"))) or current_user_can('manage_options')) {
+				if (is_user_logged_in()) {
+					$post["post_links"]["quote"] = array(
+						"link" => "<i class='fa fa-quote-right fa-fw'></i><a href='" . ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $record, array(AppBase::FORUM_QUOTE, $post["id"])) . "'>&nbsp;Quote</a>",
+					);
+				}
+				if (($thread["user_id"] == get_current_user_id()) or current_user_can('manage_options')) {
+					$post["post_links"]["solve_post"] = array(
 						"link" => "<i class='fa fa-check fa-fw'></i><a data-nonce='$nonce' data-post-id='" . $post["id"] . "' data-thread-id='$record' class='marksolved' href='javascript:void(0)'>&nbsp;Mark question solved by this post</a>",
-					),
-					"quote" => array(
-						"link" =>"<i class='fa fa-quote-right fa-fw'></i><a href='".ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $record, array(AppBase::FORUM_QUOTE, $post["id"]))."'>&nbsp;Quote</a>",
-					),
-				);
-				if (!$thread["is_question"] or $thread["is_solved"]) {
-					unset($post["post_links"]["solve_post"]);
+					);
+				}
+				if ((get_current_user_id() == $post["user_id"]) or current_user_can('manage_options')) {
+					$post["post_links"]["edit"] = array(
+						"link" => "<i class='fa fa-edit fa-fw'></i><a href='" . ForumHelper::getLink(AppBase::EDIT_POST_VIEW_ACTION, $post["id"]) . "'>&nbsp;Edit</a>",
+					);
+				}
+				if (current_user_can('manage_options')) {
+					$post["post_links"]["delete"] = array(
+						"link" => "<i class='fa fa-remove fa-fw'></i><a data-nonce='$nonce' data-post-id='" . $post["id"] . "' class='deletepost' href='javascript:void(0)'>&nbsp;Delete</a>",
+					);
 				}
 			}
+			if (!$thread["is_question"] or $thread["is_solved"]) {
+				unset($post["post_links"]["solve_post"]);
+			}
+
 		}
 
 		$subject = $thread["subject"];
@@ -218,7 +296,7 @@ class ForumHelper
 
 	function outPutFilter($string)
 	{
-		return wpautop(stripslashes($this->bb_parser->Parse($string)));
+		return wpautop(($this->bb_parser->Parse(stripslashes($string))));
 	}
 
 	/*
@@ -264,35 +342,61 @@ class ForumHelper
 	}
 
 	/*
+		* @param
+		* @return
+		*/
+	public function getForums()
+	{
+		$sql = "select * from " . AppBase::$forums_table . " f
+				 order by f.sort_order";
+		$result = $this->db->get_results($sql, ARRAY_A);
+		if (!$result) {
+			return array();
+		}
+
+		return $result;
+	}
+
+	/*
 	* @param
 	* @return
 	*/
 	public function getThreadsInForum($forum_id, $offset)
 	{
-		$limit_query = "LIMIT $offset," . AppBase::THREAD_PAGE_COUNT;
+		$limit_query = "LIMIT $offset," . get_option(AppBase::OPTION_THREADS_VIEW_COUNT);
 
 		$sql = "select t.*, count(distinct(p.id))-1 as post_replies, max(p.date) as last_post from " . AppBase::$threads_table . " t
 			left join " . AppBase::$posts_table . " p on t.id = p.parent_id
 				where t.parent_id = '$forum_id'
-			group by t.id order by (status = 'sticky') DESC, last_post DESC $limit_query";
+			group by t.id order by (sticky = '1') DESC, last_post DESC $limit_query";
 		$threads = $this->db->get_results($sql, ARRAY_A);
+
 		if (!$threads) {
 			return false;
 		}
 
 		foreach ($threads as &$thread) {
+			$nonce = wp_create_nonce("wpforum_ajax_nonce");
+			$thread["links"] = array();
+			if (current_user_can('manage_options')) {
+				$thread["links"]["delete"] = '<span class="pull-right"><button type="button" data-nonce="' . $nonce . '" data-thread-id="' . $thread["id"] . '" class="btn btn-danger btn-xs deletethread"><i class="fa fa-remove"></i> Delete</button></span>';
+				$thread["links"]["move"] = '<span class="pull-right"><a href="' . self::getLink(AppBase::MOVE_THREAD_VIEW_ACTION, $thread["id"]) . '" type="button" class="btn btn-primary btn-xs movethread"><i class="fa fa-share"></i> Move</a></span>';
+
+			}
 			$thread["href"] = self::getLink(AppBase::THREAD_VIEW_ACTION, $thread["id"]);
 			$thread["icon"] = self::getPng($thread);
 			$thread["user"] = $this->getUserDataFiltered($thread["user_id"]);
 			$thread["last_poster"] = $this->lastPoster($thread["id"]);
-			$thread["last_poster"]["avatar"] = $this->getAvatar($thread["last_poster"]["user_email"], 22);
+			$thread["last_poster"]["avatar"] = $this->getAvatar($thread["last_poster"]["user_email"], 32, "left", "avatar-22");
 			$thread["prefix"] = $this->getThreadPrefix($thread);
-		}
+			if(is_user_logged_in())
+				$thread["links"]["rss"] = '<span class="pull-right"><a href="'.self::getLink(AppBase::RSS_THREAD_ACTION, $thread["id"]).'" class="btn btn-link"><i class="fa fa-rss-square orange"></i>&nbsp;</a></span>';
 
+		}
 		return $threads;
 	}
 
-	function getAvatar($email, $size)
+	function getAvatar($email, $size, $align = "", $class = "")
 	{
 		$default = "";
 		/* Check if we are using ssl */
@@ -303,7 +407,7 @@ class ForumHelper
 		}
 		$grav_url = "$host/avatar/" . md5(strtolower(trim($email))) . "?d=" . urlencode($default) . "&s=" . $size;
 
-		$avtar_img = "<img class='avatar' src='$grav_url' height='$size' width='$size'>";
+		$avtar_img = "<img align='$align' class='avatar $class' src='$grav_url' height='$size' width='$size'>";
 
 		return $avtar_img;
 	}
@@ -311,16 +415,22 @@ class ForumHelper
 	function getThreadPrefix(array $thread)
 	{
 		$prefix = "";
-		if ($thread["is_solved"]) {
-			$prefix = "<span class='forum-solved-prefix'>Solved</span>";
+
+		if ($thread["sticky"] == "1") {
+			$prefix .= "<span class='label label-success'>Pinned</span>";
 		}
-		if ($thread["status"] == "sticky") {
-			$prefix = "<span class='forum-sticky-prefix'>Sticky</span>";
+		if ($thread["moved_from"]) {
+			$prefix .= "<span class='label label-default'>Moved</span>";
 		}
+		/*
 		if ($thread["status"] == "closed") {
-			$prefix = "<span class='forum-closed-prefix'>Closed</span>";
+			$prefix .= "<span class='label label-danger'>Closed</span>";
 		}
-		return empty($prefix) ? "" : $prefix . ": &nbsp;";
+		if ($thread["is_solved"]) {
+			$prefix .= "<span class='label label-success'>Solved</span>";
+		}
+		*/
+		return empty($prefix) ? "" : $prefix . " ";
 	}
 
 
@@ -366,6 +476,10 @@ class ForumHelper
 		*/
 	public function getPng($thread)
 	{
+
+		if ($thread["status"] == "closed")
+			return "closed";
+
 		switch ($thread["is_question"]) {
 			case "1":
 				if ($thread["is_solved"]) {
@@ -376,11 +490,9 @@ class ForumHelper
 				break;
 			case "0":
 				if ($thread["status"] == "sticky")
-					return "sticky";
+					return "open";
 				if ($thread["status"] == "open")
 					return "open";
-				if ($thread["status"] == "closed")
-					return "closed";
 				break;
 			default:
 				return "open";
@@ -422,6 +534,9 @@ class ForumHelper
 			"description",
 		);
 		$user = get_userdata($user_id)->data;
+
+		unset($user->user_pass);
+		unset($user->user_activation_key);
 		foreach ($metas as $meta) {
 			$user->meta[$meta] = get_user_meta($user_id, $meta, true);
 		}
@@ -514,7 +629,7 @@ class ForumHelper
 
 		foreach ($cats as $cat) {
 			$s = "";
-			if($cat["id"] == $selected){
+			if ($cat["id"] == $selected) {
 				$s = "selected";
 			}
 
@@ -524,6 +639,26 @@ class ForumHelper
 		$dd .= "</select>";
 
 		return $dd;
+	}
+
+	function getForumDD($selected)
+	{
+		$cats = $this->getCategories();
+		$d = "";
+		foreach ($cats as $cat) {
+			$d .= "<option disabled>{$cat["name"]}</option>";
+			$forums = $this->getForumsInCategory($cat["id"]);
+
+			foreach ($forums as $forum) {
+				$s = "";
+				if ($forum["id"] == $selected) {
+					$s = "selected";
+				}
+				$d .= "<option $s value='{$forum["id"]}'>&nbsp; -- {$forum["name"]}</option>";
+			}
+		}
+
+		return $d;
 	}
 }
 

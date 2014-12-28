@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>{$data.site_title}</title>
+        <link>{$data.site_permalink}</link>
+        <description>{$data.description}</description>
+        {foreach from=$data.posts item=post}
+        <item>
+            <title>{$post.subject}</title>
+            <link>{$post.permalink}</link>
+            <description>{$post.text}</description>
+            <guid>{$post.permalink}</guid>
+        </item>
+        {/foreach}
+    </channel>
+</rss>

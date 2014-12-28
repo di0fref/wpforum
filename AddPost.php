@@ -35,5 +35,5 @@ $sql_post = "INSERT INTO " . AppBase::$posts_table . "
 		)";
 
 $wpdb->query($sql_post);
-
-$redirect_url = ForumHelper::getLink(AppBase::THREAD_VIEW_ACTION, $thread_id);
+$page = ForumHelper::getInstance()->getTotalPages(AppBase::THREAD_VIEW_ACTION, $thread_id);
+$redirect_url = ForumHelper::getLink(AppBase::THREAD_VIEW_ACTION, $thread_id, array(AppBase::FORUM_PAGE, $page."#post-{$post_id}"));

@@ -862,7 +862,7 @@ class BBCodeLibrary
 		if (isset($params['name'])) {
 			$title = htmlspecialchars(trim($params['name'])) . " wrote";
 			if (isset($params['date']))
-				$title .= " on " . htmlspecialchars(trim($params['date']));
+				$title .= " on " . htmlspecialchars(trim($params['date']),ENT_QUOTES);
 			$title .= ":";
 			if (isset($params['url'])) {
 				$url = trim($params['url']);

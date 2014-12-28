@@ -30,6 +30,29 @@ class ForumView
 		$this->assignTrail();
 	}
 
+	function permission($action)
+	{
+		switch ($action) {
+			case AppBase::NEW_THREAD_VIEW_ACTION:
+				$message = "You need to be logged in to start a new topic.";
+				break;
+			case AppBase::EDIT_THREAD_VIEW_ACTION:
+				$message = "You do not have permission edit this topic.";
+				break;
+			case AppBase::NEW_POST_VIEW_ACTION:
+				$message = "You need to be logged in to reply to this topic.";
+				break;
+			case AppBase::EDIT_POST_VIEW_ACTION:
+				$message = "You do not have permission edit this post.";
+				break;
+			default:
+				$message = "You do not have permission to view this page.";
+				break;
+		}
+		$this->smarty->assign("message", $message);
+		return $this->smarty->fetch($this->template_dir . "/permission.tpl");
+	}
+
 	function getNewThreadView()
 	{
 		$forum = $this->helper->getForum($_REQUEST["record"]);
@@ -39,6 +62,31 @@ class ForumView
 		$this->smarty->assign("record", $_REQUEST["record"]);
 		$this->smarty->assign("nonce", wp_create_nonce("wpforum_insert_nonce"));
 		return $this->smarty->fetch($this->template_dir . "/new_thread_form.tpl");
+	}
+
+	function getEditPostView()
+	{
+		$post = $this->helper->getPost($_REQUEST["record"]);
+
+		$post["text"] = stripslashes($post["text"]);
+		$post["subject"] = stripslashes($post["subject"]);
+
+		$this->smarty->assign("nonce", wp_create_nonce("wpforum_insert_nonce"));
+		$this->smarty->assign("post", $post);
+		return $this->smarty->fetch($this->template_dir . "/edit_post_form.tpl");
+	}
+
+	function getEditThreadView()
+	{
+		$thread = $this->helper->getThread($_REQUEST["record"]);
+		$thread["subject"] = stripslashes($thread["subject"]);
+		$this->smarty->assign("user_can_pin", 0);
+		if (current_user_can('manage_options')) {
+			$this->smarty->assign("user_can_pin", 1);
+		}
+		$this->smarty->assign("nonce", wp_create_nonce("wpforum_insert_nonce"));
+		$this->smarty->assign("thread", $thread);
+		return $this->smarty->fetch($this->template_dir . "/edit_thread_form.tpl");
 	}
 
 	function getNewPostView()
@@ -53,8 +101,9 @@ class ForumView
 			$user = $this->helper->getUserDataFiltered($post["user_id"]);
 
 			$quote_data = array(
-				"text" => "[quote name=" . $user->display_name . " date=" . date("Y-m-d H:i") . "]" . $post["text"] . "[/quote]",
-				"subject" => "Re: ".$thread["subject"],
+				"text" => stripslashes('[quote name=' . $user->display_name . ' date="' . strftime(get_option(AppBase::OPTION_DATE_FORMAT)) . '"]' . $post["text"] . '[/quote]'),
+				"subject" => stripslashes("Re: " . $thread["subject"]),
+				"permalink" => "action=viewpost&record={$post["id"]}",
 			);
 
 			$this->smarty->assign("quote_data", $quote_data);
@@ -66,6 +115,19 @@ class ForumView
 		return $this->smarty->fetch($this->template_dir . "/new_post_form.tpl");
 	}
 
+	function getMoveThreadView()
+	{
+		$thread = ForumHelper::getInstance()->getThread($this->record);
+		$forum = ForumHelper::getInstance()->getForum($thread["parent_id"]);
+
+		$this->smarty->assign("nonce", wp_create_nonce("wpforum_insert_nonce"));
+		$this->smarty->assign("thread", $thread);
+		$this->smarty->assign("forum", $forum);
+		$this->smarty->assign("forumDD", $this->helper->getForumDD($forum["id"]));
+
+		return $this->smarty->fetch($this->template_dir . "/move_thread_form.tpl");
+	}
+
 	function assignTrail()
 	{
 		$this->smarty->assign("trail", $this->helper->getTrail($this->action, $this->record));
@@ -74,42 +136,52 @@ class ForumView
 	public function assignButtons()
 	{
 		$current_user_id = get_current_user_id();
+
+		$links = array();
+
 		if (is_user_logged_in()) {
 			$nonce = wp_create_nonce("wpforum_ajax_nonce");
-			$buttons = array(
-				AppBase::FORUM_VIEW_ACTION => array(
-					"new_thread" => "<a data-forum-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::NEW_THREAD_VIEW_ACTION, $this->record) . "'>Start Topic</a>",
-				),
-				AppBase::THREAD_VIEW_ACTION => array(
-					"new_post" => "<a data-thread-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $this->record) . "'>Reply</a>",
-					//"subscribe_rss" => "<a class='forum-button subscribe_rss' href='" . ForumHelper::getLink(AppBase::RSS_POST_ACTION, $this->record) . "'>RSS Feed</a>",
-					//"subscribe_email" => "<a class='forum-button subscribe_email' href='" . ForumHelper::getLink(AppBase::EMAIL_POST_ACTION, $this->record) . "'>Email Subscription</a>"
-				),
-				AppBase::MAIN_VIEW_ACTION => array(),
-				AppBase::NEW_THREAD_VIEW_ACTION => array(),
-				AppBase::NEW_POST_VIEW_ACTION => array()
-			);
+
+			$links[AppBase::MAIN_VIEW_ACTION] = "";
+			$links[AppBase::NEW_THREAD_VIEW_ACTION] = "";
+			$links[AppBase::NEW_POST_VIEW_ACTION] = "";
+			$links[AppBase::EDIT_POST_VIEW_ACTION] = "";
+			$links[AppBase::EDIT_THREAD_VIEW_ACTION] = "";
+			$links[AppBase::MOVE_THREAD_VIEW_ACTION] = "";
+
+			$links[AppBase::FORUM_VIEW_ACTION]["buttons"]["new_thread"] = "<a data-forum-id='" . $this->record . "' class='btn btn-warning' href='" . ForumHelper::getLink(AppBase::NEW_THREAD_VIEW_ACTION, $this->record) . "'><i class='fa fa-plus'></i>&nbsp;Start Topic &nbsp;</a>";
+			$links[AppBase::FORUM_VIEW_ACTION]["tools"]["forum_rss"] = "<a data-forum-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::RSS_FORUM_ACTION, $this->record) . "'><i class='fa fa-rss-square orange'></i>&nbsp;RSS &nbsp;</a>";
+			$links[AppBase::THREAD_VIEW_ACTION]["buttons"]["new_post"] = "<a data-thread-id='" . $this->record . "' class='btn btn-warning' href='" . ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $this->record) . "'><i class='fa fa-reply'></i>&nbsp;Post reply &nbsp;</a>";
 
 			switch ($this->action) {
 				case AppBase::THREAD_VIEW_ACTION:
 					$thread = $this->helper->getThread($this->record);
-					if ($current_user_id == $thread["user_id"]) {
+					if ($current_user_id == $thread["user_id"] or current_user_can('manage_options')) {
+
+						$links[AppBase::THREAD_VIEW_ACTION]["tools"]["edit"] = "<a data-thread-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::EDIT_THREAD_VIEW_ACTION, $this->record) . "'><i class='fa fa-edit'></i>&nbsp;Edit &nbsp;</a>";
+
 						if ($thread["is_question"] && !$thread["is_solved"]) {
-							$buttons[$this->action]["mark_solved"] = "<a data-nonce='$nonce' data-thread-id='$this->record' class='' href='javascript:void(0)'>Mark question solved</a>";
+							$links[AppBase::THREAD_VIEW_ACTION]["tools"]["mark_solved"] = "<a data-nonce='$nonce' data-thread-id='$this->record' class='marksolved' href='javascript:void(0)'><i class='fa fa-check'></i>&nbsp;Mark question solved &nbsp;</a>";
+						}
+						if (current_user_can('manage_options') and $thread["status"] != "closed") {
+							$links[$this->action]["tools"]["close"] = "<a data-nonce='$nonce' data-thread-id='$this->record' class='close_thread' href='javascipt:void(0)'><i class='fa fa-remove'></i>&nbsp;Close &nbsp;</a>";
 						}
 						if ($thread["status"] == "closed") {
-							unset($buttons[$this->action]["new_post"]);
+							unset($links[AppBase::THREAD_VIEW_ACTION]["tools"]["new_post"]);
+							unset($links[AppBase::THREAD_VIEW_ACTION]["tools"]["close"]);
+							unset($links[AppBase::THREAD_VIEW_ACTION]["tools"]["edit"]);
 						}
 					}
 					break;
 			}
-			$this->smarty->assign("buttons", $buttons[$this->action]);
+			$this->smarty->assign("buttons", $links[$this->action]);
 		} else {
 			$url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-			$this->smarty->assign("buttons", array(
-				"login" => "<a class='' href='" . wp_login_url($url) . "'>Login</a>",
-				"signup" => "<a class='' href='" . wp_registration_url() . "'>Sign Up</a>",
-			));
+
+			$links[$this->action]["buttons"]["login"] = "<a class='btn btn-success' href='" . wp_login_url($url) . "'><i class='fa fa-key'></i>&nbsp;Login &nbsp;</a>";
+			$links[$this->action]["buttons"]["register"] = "<a class='btn btn-info' href='" . wp_registration_url() . "'><i class='fa fa-user'></i>&nbsp;Register &nbsp;</a>";
+
+			$this->smarty->assign("buttons", $links[$this->action]);
 		}
 	}
 
@@ -119,6 +191,8 @@ class ForumView
 	*/
 	public function assignMisc()
 	{
+
+		$message = "You need have to register before you can post: click the register link below to proceed. To start viewing messages,	select the forum that you want to visit from the selection below.";
 		$config = array(
 			"date_format" => get_option(AppBase::OPTION_DATE_FORMAT),
 			"images_dir" => plugins_url("assets/images", __FILE__),
@@ -126,6 +200,26 @@ class ForumView
 		$this->smarty->assign("border", AppBase::$border);
 		$this->smarty->assign("forum_table_class", "forum-table");
 		$this->smarty->assign("config", $config);
+
+		if (!is_user_logged_in())
+			$this->smarty->assign("message", $message);
+
+	}
+
+	public static function getThreadRSS()
+	{
+		$smarty = new Smarty();
+		$data = ForumHelper::getInstance()->getPostsInThreadforRSS($_REQUEST["record"]);
+		$smarty->assign("data", $data);
+
+		return $smarty->fetch(WPFPATH . "/tpls" . "/rss_thread.xml");
+	}
+
+	public static function getForumRSS()
+	{
+		$smarty = new Smarty();
+		wp_die("TODO");
+		return $smarty->fetch(WPFPATH . "/tpls" . "/rss_forum.xml");
 
 	}
 

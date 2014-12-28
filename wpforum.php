@@ -18,12 +18,15 @@ register_activation_hook(__FILE__, array(&$appBase, 'install'));
 add_action("the_content", array(&$appBase, "main"));
 add_action("wp_head", array(&$appBase, "head"));
 add_action("wp_enqueue_scripts", array(&$appBase, "enqueue_scripts"));
-add_action("init", array(&$appBase, "init"));
-add_action('template_redirect', array(&$appBase, "processForm"));
+add_action("register_activation_hook", array(&$appBase, "activation"));
+
+add_action('template_redirect', array(&$appBase, "preHeader"));
 
 /* Ajax action */
 add_action("wp_ajax_marksolved", array(&$ajax, 'marksolved'));
-
+add_action("wp_ajax_closethread", array(&$ajax, 'closethread'));
+add_action("wp_ajax_deletethread", array(&$ajax, 'deletethread'));
+add_action("wp_ajax_deletepost", array(&$ajax, 'deletepost'));
 /* Admin */
 add_action('admin_enqueue_scripts', 'wpforum_admin_enqueue_scripts', '999');
 add_action('admin_init', 'wpforum_admin_init');
@@ -39,18 +42,18 @@ function wpforum_admin_init()
 
 function wpforum_admin_process_form()
 {
-	switch($_REQUEST["action"]){
+	switch ($_REQUEST["action"]) {
 		case "wpforum_add_category":
-			ForumHelper::add_category($_REQUEST["name"],$_REQUEST["description"], $_REQUEST["sort_order"]);
+			ForumHelper::add_category($_REQUEST["name"], $_REQUEST["description"], $_REQUEST["sort_order"]);
 			break;
 		case "wpforum_add_forum":
-			ForumHelper::add_forum($_REQUEST["name"],$_REQUEST["description"], $_REQUEST["sort_order"], $_REQUEST["category"]);
+			ForumHelper::add_forum($_REQUEST["name"], $_REQUEST["description"], $_REQUEST["sort_order"], $_REQUEST["category"]);
 			break;
 		case "wpforum_edit_category":
-			ForumHelper::update_category($_REQUEST["id"], $_REQUEST["name"],$_REQUEST["description"], $_REQUEST["sort_order"]);
+			ForumHelper::update_category($_REQUEST["id"], $_REQUEST["name"], $_REQUEST["description"], $_REQUEST["sort_order"]);
 			break;
 		case "wpforum_edit_forum":
-			ForumHelper::update_forum($_REQUEST["forum"],$_REQUEST["name"],$_REQUEST["description"], $_REQUEST["sort_order"], $_REQUEST["category_id"]);
+			ForumHelper::update_forum($_REQUEST["forum"], $_REQUEST["name"], $_REQUEST["description"], $_REQUEST["sort_order"], $_REQUEST["category_id"]);
 			break;
 	}
 	wp_redirect(admin_url('admin.php?page=wpforum-submenu-manage'));
@@ -58,7 +61,7 @@ function wpforum_admin_process_form()
 
 function wpforum_admin_enqueue_scripts($hook_suffix)
 {
-	if(strpos($hook_suffix, "wpforum") === false){
+	if (strpos($hook_suffix, "wpforum") === false) {
 		return;
 	}
 	wp_register_script('wpforum_admin_validate', plugins_url('assets/js/jquery.validate.min.js', __FILE__), array("jquery.validate"), '', false);
@@ -115,7 +118,24 @@ function wpforum_edit_forum()
 
 function wpforum_register_settings()
 {
-	register_setting('wpforum-settings-group', 'wpforum_threads_per_page');
-	register_setting('wpforum-settings-group', 'wpforum_posts_per_page');
-	register_setting('wpforum-settings-group', 'wpforum_date_format');
+	register_setting('wpforum-settings-group', AppBase::OPTION_THREADS_VIEW_COUNT);
+	register_setting('wpforum-settings-group', AppBase::OPTION_POSTS_VIEW_COUNT);
+	register_setting('wpforum-settings-group', AppBase::OPTION_DATE_FORMAT);
+}
+
+//associating a function to login hook
+add_action('wp_login', 'set_last_login');
+
+function set_last_login($login)
+{
+	$user = get_user_by("login", $login);
+	update_user_meta($user->ID, 'last_login', current_time('mysql'));
+}
+
+function get_last_login($user_id)
+{
+	$last_login = get_user_meta($user_id, 'last_login', true);
+	$date_format = get_option('date_format') . ' ' . get_option('time_format');
+	$the_last_login = mysql2date($date_format, $last_login, false);
+	return $the_last_login;
 }

@@ -21,16 +21,29 @@ class AppBase
 	const THREADS = "wpforum_threads";
 	const POSTS = "wpforum_posts";
 	const USERS = "users";
+	const LIKES = "wpforum_likes";
 	//const USERS_THREADS = "wpforum_users_threads";
 
 	const FORUM_VIEW_ACTION = "viewforum";
 	const THREAD_VIEW_ACTION = "viewthread";
 	const NEW_THREAD_VIEW_ACTION = "newthread";
 	const NEW_POST_VIEW_ACTION = "newpost";
-	const RSS_POST_ACTION = "rss_feed";
+
+	const RSS_THREAD_ACTION = "threadrss";
+	const RSS_FORUM_ACTION = "forumrss";
+
 	const EMAIL_POST_ACTION = "email_sub";
 	const MARK_SOLVED_ACTION = "marksolved";
 	const MAIN_VIEW_ACTION = "main";
+	const POST_VIEW_ACTION = "viewpost";
+
+	const EDIT_THREAD_VIEW_ACTION = "editthread";
+	const EDIT_POST_VIEW_ACTION = "editpost";
+	const DELETE_POST_ACTION = "deletepost";
+	const DELETE_THREAD_ACTION = "deletethread";
+	const MOVE_THREAD_VIEW_ACTION = "movethread";
+
+	const OPTION_DEFAULT_DATE_FORMAT = "%h %e, %Y %l:%S %p";
 
 	const RECORD = "record";
 	const APP_ACTION = "action";
@@ -56,6 +69,7 @@ class AppBase
 	static $threads_table;
 	static $posts_table;
 	static $users_table;
+	static $likes_table;
 	//static $users_threads_table;
 
 	protected $action;
@@ -71,7 +85,7 @@ class AppBase
 		self::$threads_table = $table_prefix . self::THREADS;
 		self::$posts_table = $table_prefix . self::POSTS;
 		self::$users_table = $table_prefix . self::USERS;
-		//self::$users_threads_table = $table_prefix . self::USERS_THREADS;
+		self::$likes_table = $table_prefix . self::LIKES;
 
 	}
 
@@ -80,17 +94,16 @@ class AppBase
 		self::THREAD_VIEW_ACTION,
 		self::NEW_THREAD_VIEW_ACTION,
 		self::NEW_POST_VIEW_ACTION,
-		//self::RSS_POST_ACTION,
+		self::RSS_THREAD_ACTION,
 		//self::EMAIL_POST_ACTION,
 		self::MARK_SOLVED_ACTION
 	);
 
-	function init()
+	function avtivation()
 	{
-		add_option(self::OPTION_DATE_FORMAT, "%B %e, %Y");
-		add_option(self::OPTION_THREADS_VIEW_COUNT, 20);
-		add_option(self::OPTION_POSTS_VIEW_COUNT . 20);
-
+		update_option(self::OPTION_DATE_FORMAT, self::OPTION_DEFAULT_DATE_FORMAT);
+		update_option(self::OPTION_THREADS_VIEW_COUNT, 20);
+		update_option(self::OPTION_POSTS_VIEW_COUNT, 20);
 	}
 
 	public function main($content)
@@ -102,8 +115,7 @@ class AppBase
 
 		if (isset($_REQUEST[self::APP_ACTION])) {
 			$this->action = $_REQUEST[self::APP_ACTION];
-		}
-		else{
+		} else {
 			$this->action = self::MAIN_VIEW_ACTION;
 		}
 		if (isset($_REQUEST[self::RECORD])) {
@@ -132,15 +144,45 @@ class AppBase
 				$data = $view->getTopicView();
 				break;
 			case self::NEW_THREAD_VIEW_ACTION:
-				$data = $view->getNewThreadView();
+				if (is_user_logged_in()) {
+					$data = $view->getNewThreadView();
+				} else {
+					$data = $view->permission(self::NEW_THREAD_VIEW_ACTION);
+				}
 				break;
 			case self::NEW_POST_VIEW_ACTION:
-				$data = $view->getNewPostView();
+				if (is_user_logged_in()) {
+					$data = $view->getNewPostView();
+				} else {
+					$data = $view->permission(self::NEW_POST_VIEW_ACTION);
+				}
+				break;
+			case self::EDIT_POST_VIEW_ACTION:
+				if (is_user_logged_in()) {
+					$data = $view->getEditPostView();
+				} else {
+					$data = $view->permission(self::NEW_POST_VIEW_ACTION);
+				}
+				break;
+			case self::EDIT_THREAD_VIEW_ACTION:
+				if (is_user_logged_in()) {
+					$data = $view->getEditThreadView();
+				} else {
+					$data = $view->permission(self::EDIT_THREAD_VIEW_ACTION);
+				}
+				break;
+			case self::MOVE_THREAD_VIEW_ACTION:
+				if (is_user_logged_in()) {
+					$data = $view->getMoveThreadView();
+				} else {
+					$data = $view->permission(self::MOVE_THREAD_VIEW_ACTION);
+				}
 				break;
 			case self::MAIN_VIEW_ACTION:
 				$data = $view->getMainView();
 				break;
-			default: wp_die("Error!");
+			default:
+				wp_die("Error!");
 		}
 
 		$header = $this->getHeader();
@@ -249,6 +291,8 @@ class AppBase
 			  solved_post_id varchar(36)  default '',
 			  user_id int(11) NOT NULL,
 			  sort int(11) default 0,
+			  sticky bool default 0,
+			  moved_from varchar(36) default '',
 			  PRIMARY KEY  (id),
 			  INDEX parent_idx (parent_id),
 			  INDEX user_idx (user_id)
@@ -267,25 +311,24 @@ class AppBase
 			  INDEX parent_idx (parent_id),
 			  INDEX user_idx (user_id)
 			);";
-
-		/*$user_read = "
-		CREATE TABLE IF NOT EXISTS " . self::$users_threads_table . " (
-			  id varchar(36) NOT NULL default '',
-				user_id varchar(36) NOT NULL default '',
-				thread_id varchar(36) NOT NULL default '',
-				`date` datetime NOT NULL default '0000-00-00 00:00:00',
-			  PRIMARY KEY  (id),
-			  INDEX user_thread_idx (user_id, thread_id),
-			  UNIQUE user_thread_u_idx (user_id, thread_id)
-			);";*/
-
+		/*
+				$likes_sql = "
+					CREATE TABLE IF NOT EXISTS " . self::$likes_table . " (
+					  id varchar(36) NOT NULL default '',
+					  user_id varchar(36) NOT NULL default '',
+					  thread_id varchar(36) NOT NULL default '',
+					  PRIMARY KEY  (id),
+					  INDEX thread_idx (thread_id),
+					  INDEX user_idx (user_id)
+					);";
+		*/
 		require_once(ABSPATH . 'wp-admin/upgrade-functions.php');
 
 		dbDelta($categories_sql);
 		dbDelta($forums_sql);
 		dbDelta($threads_sql);
 		dbDelta($posts_sql);
-		//dbDelta($user_read);
+//		dbDelta($likes_sql);
 
 	}
 
@@ -306,8 +349,8 @@ class AppBase
 	{
 		wp_register_style('wpforum_styles', plugins_url('assets/styles/style.css', __FILE__), array(), '', 'all');
 		wp_register_style('jquery_ui_styles', plugins_url('assets/js/jquery-ui/jquery-ui.min.css', __FILE__), array(), '', 'all');
-		wp_register_style('wpforum_bootstrap_styles', plugins_url('assets/bootstrap-3.0.3/css/bootstrap.min.css', __FILE__), array(), '', 'all');
-		wp_register_style('wpforum_bootstrap_styles_theme', plugins_url('assets/bootstrap-3.0.3/css/bootstrap-theme.min.css', __FILE__), array(), '', 'all');
+		wp_register_style('wpforum_bootstrap_styles', plugins_url('assets/bootstrap-3.3.1/css/bootstrap.min.css', __FILE__), array(), '', 'all');
+		wp_register_style('wpforum_bootstrap_styles_theme', plugins_url('assets/bootstrap-3.3.1/css/bootstrap-theme.min.css', __FILE__), array(), '', 'all');
 		wp_register_style('wpforum_font_awsome', plugins_url('assets/font-awesome/css/font-awesome.min.css', __FILE__), array(), '', 'all');
 
 		wp_enqueue_style('wpforum_styles');
@@ -321,21 +364,44 @@ class AppBase
 		wp_register_script('wpforum_script', plugins_url('assets/js/forum.js', __FILE__), array("jquery"), '', false);
 		wp_register_script('jquery_validate_js', plugins_url('assets/js/jquery.validate.min.js', __FILE__), array("jquery"), '', false);
 		wp_register_script('wpforum_bootstrap', plugins_url('assets/bootstrap-3.0.3/js/bootstrap.min.js', __FILE__), array("jquery"), '', false);
+		wp_register_script('jquery_confirm_js', plugins_url('assets/js/jquery.confirm/jquery.confirm.min.js', __FILE__), array("jquery"), '', false);
 
 		wp_enqueue_script('wpforum_script');
 		wp_enqueue_script('jquery_ui_js');
 		wp_enqueue_script('jquery_validate_js');
 		wp_enqueue_script('wpforum_bootstrap');
 
+		wp_enqueue_script('jquery_confirm_js');
 
 
 		wp_localize_script('wpforum_script', 'forumAjax', array('ajaxurl' => admin_url('admin-ajax.php')));
 
 	}
 
-	function processForm()
+	function preHeader()
 	{
+		/* RSS Feed hook*/
+		if(isset($_REQUEST[self::APP_ACTION]) and $_REQUEST[self::APP_ACTION] == self::RSS_THREAD_ACTION){
+			header('Content-Type: text/xml; charset=UTF-8');
+			die(ForumView::getThreadRSS());
+		}
+		/* RSS Feed hook*/
+		if(isset($_REQUEST[self::APP_ACTION]) and $_REQUEST[self::APP_ACTION] == self::RSS_FORUM_ACTION){
+			header('Content-Type: text/xml; charset=UTF-8');
+			die(ForumView::getForumRSS());
+		}
 		/* Processing forms */
+
+		/* New thread */
+		if (isset($_POST["forum-form-move-thread"])) {
+			if (!current_user_can('manage_options')) {
+				wp_die("No naughty business please");
+			}
+			self::verifyNonce(self::WPFORUM_INSERT_NONCE);
+			include("MoveThread.php");
+			header("Location:" . $redirect_url);
+			exit();
+		}
 
 		/* New thread */
 		if (isset($_POST["forum-form-new-thread"])) {
@@ -347,7 +413,16 @@ class AppBase
 			header("Location:" . $redirect_url);
 			exit();
 		}
-
+		/* Edit thread */
+		if (isset($_POST["forum-form-edit-thread"])) {
+			if (!is_user_logged_in()) {
+				wp_die("No naughty business please");
+			}
+			self::verifyNonce(self::WPFORUM_INSERT_NONCE);
+			include("EditThread.php");
+			header("Location:" . $redirect_url);
+			exit();
+		}
 		/* Post reply*/
 		if (isset($_POST["forum-form-new-post"])) {
 			if (!is_user_logged_in()) {
@@ -355,6 +430,20 @@ class AppBase
 			}
 			self::verifyNonce(self::WPFORUM_INSERT_NONCE);
 			include("AddPost.php");
+
+			$this->notifyThreadStarter($thread_id, $post_id);
+
+			header("Location:" . $redirect_url);
+			exit();
+		}
+
+		/* Edit reply*/
+		if (isset($_POST["forum-form-edit-post"])) {
+			if (!is_user_logged_in()) {
+				wp_die("No naughty business please");
+			}
+			self::verifyNonce(self::WPFORUM_INSERT_NONCE);
+			include("EditPost.php");
 			header("Location:" . $redirect_url);
 			exit();
 		}
@@ -366,7 +455,28 @@ class AppBase
 			wp_die("No naughty business please");
 		}
 	}
+
+	function notifyThreadStarter($thread_id, $post_id)
+	{
+		$user = ForumHelper::getInstance()->getUserDataFiltered(get_current_user_id());
+
+		$thread = ForumHelper::getInstance()->getThread($thread_id);
+		$post = ForumHelper::getInstance()->getPost($post_id);
+
+		$headers = 'MIME-Version: 1.0' . "\r\n";
+		$headers .= 'Content-type: text/html; charset=UTF-8' . "\r\n";
+
+		$subject = get_bloginfo("name") . " - Forum - New Reply";
+		$body = "There are a new reply on your topic <a href=''>{$thread["subject"]}</a>\n\n>";
+		$body .= "By: {$user->display_name}<br>";
+		$body .= "Date: " . strftime(get_option(AppBase::OPTION_DATE_FORMAT), strtotime($post["date"])) . "<br><br>";
+		$body .= "Reply:<br>";
+		$body .= ForumHelper::getInstance()->bb_parser->Parse("{$post["text"]}");
+
+		wp_mail($user->user_email, $subject, $body, $headers);
+	}
 }
+
 
 function _paginate($reload, $page, $tpages)
 {

@@ -10,23 +10,24 @@
 			<tr valign="top">
 				<th scope="row">Threads per page</th>
 				<td>
-					<input class="required" type="text" name="wpforum_threads_per_page" value="<?php echo get_option('wpforum_threads_per_page'); ?> "/>
+					<input class="required" type="text" name="<?php echo AppBase::OPTION_THREADS_VIEW_COUNT; ?>" value="<?php echo get_option(AppBase::OPTION_THREADS_VIEW_COUNT); ?> "/>
 				</td>
 			</tr>
 
 			<tr valign="top">
 				<th scope="row">Posts per page</th>
 				<td>
-					<input type="text" name="wpforum_posts_per_page" value="<?php echo get_option('wpforum_posts_per_page'); ?>"/>
+					<input type="text" name="<?php echo AppBase::OPTION_POSTS_VIEW_COUNT; ?>" value="<?php echo get_option(AppBase::OPTION_POSTS_VIEW_COUNT); ?>"/>
 				</td>
 			</tr>
 
 			<tr valign="top">
 				<th scope="row">Date format.</th>
-				<td><input type="text" name="wpforum_date_format" value="<?php echo get_option('wpforum_date_format'); ?>"/>
+				<td><input type="text" name="<?php echo AppBase::OPTION_DATE_FORMAT; ?>" value="<?php echo get_option(AppBase::OPTION_DATE_FORMAT); ?>"/>
 
-					<p>Default format: "F j, Y, H:i".<br>
-						Check <a href='http://php.net/manual/en/function.date.php'>http://www.php.net</a> for date
+					<p>Default format: <?php echo AppBase::OPTION_DEFAULT_DATE_FORMAT; ?>)<br>
+						Preview: <?php echo strftime(AppBase::OPTION_DEFAULT_DATE_FORMAT); ?><br>
+						Check <a href='http://php.net/strftime'>http://www.php.net</a> for date
 						formatting.</p>
 				</td>
 			</tr>

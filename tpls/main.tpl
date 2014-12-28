@@ -1,29 +1,47 @@
 <div class="forum-trail">{$trail}</div>
-
-<ul class="nav nav-pills pull-right">
-	{foreach from=$buttons item=button key=name}
-		<li>{$button}</li>
-	{/foreach}
-</ul>
-
+{if isset($message)}
+	<div class="alert alert-warning">{$message}</div>
+{/if}
+<div class="menu-row">
+	{* Tools *}
+	{if isset($buttons.tools)}
+		<div class="btn-group pull-right">
+			<button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+				Topic tools <span class="caret"></span>
+			</button>
+			<ul class="dropdown-menu" role="menu">
+				{foreach from=$buttons.tools item=button key=name}
+					<li>{$button}</li>
+				{/foreach}
+			</ul>
+		</div>
+	{/if}
+	{if isset($buttons.buttons)}
+		{* Buttons *}
+		{foreach from=$buttons.buttons item=button key=name}
+			{$button}
+		{/foreach}
+	{/if}
+</div>
+<div class="clearfix"></div>
 {foreach from=$data item=cat}
-	<table border="{$border}" class="forum-table" cellspacing='0'>
+	<table border="{$border}" class="forum-table table table-bordered table-striped" cellspacing='0'>
 		<tr>
 			<th width="60%">{$cat.name}</th>
-			<th>Threads</th>
-			<th>Posts</th>
+			<th class="align-center">Topics</th>
+			<th class="align-center">Posts</th>
 			<th>Last Post</th>
 		</tr>
 		{foreach from=$cat.forums item=forum}
 			<tr class="{cycle values="odd,even"}">
 				<td>
-					<h2 class="forumtitle">
+					<p class="forumtitle">
 						<img width="22" class="forumicon" title="{$thread.icon|ucfirst}" alt="{$thread.icon|ucfirst}" src="{$config.images_dir}/category.png">
-						<a href="{$forum.href}">{$forum.name}</a></h2>
-					<span class="forumdescription forum-small">{$forum.description}</span>
+						<a href="{$forum.href}">{$forum.name}</a></p>
+					<span class="forumdescription small">{$forum.description}</span>
 				</td>
-				<td>{$forum.thread_count|number_format:0}</td>
-				<td>{$forum.post_count|number_format:0}</td>
+				<td class="align-center">{$forum.thread_count|number_format:0}</td>
+				<td class="align-center">{$forum.post_count|number_format:0}</td>
 				<td>{$forum.last_post|timesince}</td>
 			</tr>
 		{/foreach}
