@@ -264,6 +264,7 @@ class AppBase
 			  id varchar(36) NOT NULL default '',
 			  `name` varchar(255) NOT NULL default '',
 			  `description` varchar(255) default '',
+			  sort_order int(11) default 0,
 			  PRIMARY KEY  (id)
 			);";
 
@@ -273,7 +274,7 @@ class AppBase
 			  `name` varchar(255) NOT NULL default '',
 			  parent_id varchar(36) NOT NULL default '',
 			  description varchar(255) NOT NULL default '',
-			  sort int(11) default 0,
+			  sort_order int(11) default 0,
 			  PRIMARY KEY  (id),
 			  INDEX parent_idx (parent_id)
 			);";
@@ -290,7 +291,7 @@ class AppBase
 			  is_solved bool default 0,
 			  solved_post_id varchar(36)  default '',
 			  user_id int(11) NOT NULL,
-			  sort int(11) default 0,
+			  sort_order int(11) default 0,
 			  sticky bool default 0,
 			  moved_from varchar(36) default '',
 			  PRIMARY KEY  (id),
