@@ -255,12 +255,9 @@ small, .small {
 	margin-bottom: 10px;
 }
 
-/*
-.table-striped>tbody>tr:nth-child(odd) {
-	background-color: #f1f4f7 !important;
-}
-.table-striped>tbody>tr:nth-child(odd)>td,
-.table-striped>tbody>tr:nth-child(odd)>th {
-	background-color:#f1f4f7 !important;
-}
-*/
+/* Wrap code in a big blue box. */
+div.bbcode_code {padding: 8px; border: 1px solid #eee }
+div.bbcode_code_head { background-color: #ccc; color: white;
+	font-weight: bold; padding: 0.25em 0.5em; }
+div.bbcode_code_body { background-color: #fff; color: black;
+	font: 10pt monospace; padding: 0.5em 1em; }

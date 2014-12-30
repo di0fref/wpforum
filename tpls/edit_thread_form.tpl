@@ -1,6 +1,6 @@
 <div class="forum-trail">{$trail}</div>
 <h3>Edit Topic</h3>
-<div style="width: 500px">
+<div class="forum-form">
 	<form role="form" name="forum-form-edit-thread" id="forum-form-edit-thread" method="post">
 		<div class="form-group">
 			<label for="subject">Subject</label>

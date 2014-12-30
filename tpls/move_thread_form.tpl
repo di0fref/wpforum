@@ -1,6 +1,6 @@
 <div class="forum-trail">{$trail}</div>
 <h3>Move Topic</h3>
-<div style="width: 500px">
+<div class="forum-form">
 	<form role="form" name="forum-form-move-thread" id="forum-form-move-thread" method="post">
 		<div class="form-group">
 			<label for="forum_id">Forum</label>

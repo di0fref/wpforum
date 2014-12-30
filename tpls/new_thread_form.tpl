@@ -1,6 +1,6 @@
 <div class="forum-trail">{$trail}</div>
 <h3>Start New Topic</h3>
-<div style="width: 500px">
+<div class="forum-form">
 <form role="form" name="forum-form-new-thread" id="forum-form-new-thread" method="post">
 	<div class="form-group">
 		<label for="subject">Subject</label>
@@ -12,7 +12,7 @@
 		</label>
 	</div>
 	<div class="form-group">
-		<textarea  rows="10" class="form-control" name="text" id="_bbcode" required></textarea>
+		<textarea  rows="10" class="form-control" name="text" id="text" required></textarea>
 	</div>
 	<button type="submit" class="btn btn-default" name="forum-form-new-thread">Submit</button>
 	<input type="hidden" name="record" value="{$record}">

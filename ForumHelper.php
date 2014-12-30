@@ -413,7 +413,8 @@ class ForumHelper
 		if (!$threads) {
 			return false;
 		}
-		if (is_user_logged_in()) {
+		$lastVisit = "";
+		if (is_user_logged_in() and isset($_COOKIE['lastVisit'])) {
 			$lastVisit = $_COOKIE['lastVisit'];
 		}
 		foreach ($threads as &$thread) {
@@ -425,7 +426,8 @@ class ForumHelper
 				$thread["links"]["move"] = '<span class="pull-right"><a href="' . self::getLink(AppBase::MOVE_THREAD_VIEW_ACTION, $thread["id"]) . '" type="button" class="btn btn-primary btn-xs movethread"><i class="fa fa-share"></i> Move</a></span>';
 			}
 			$thread["href"] = self::getLink(AppBase::THREAD_VIEW_ACTION, $thread["id"]);
-			if (is_user_logged_in()) {
+			$thread["is_new"] = false;
+			if (!empty($lastVisit)) {
 				$last_post = $this->getLastPostDate($thread["id"]);
 				$thread["is_new"] = ($last_post > $lastVisit) ? 1 : 0;
 
@@ -440,7 +442,6 @@ class ForumHelper
 			$thread["last_poster"]["avatar"] = $this->getAvatar($thread["last_poster"]["user_email"], 32, "left", "avatar-22");
 			$thread["prefix"] = $this->getThreadPrefix($thread);
 		}
-
 		return $threads;
 	}
 

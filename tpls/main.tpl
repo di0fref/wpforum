@@ -36,7 +36,7 @@
 			<tr class="{cycle values="odd,even"}">
 				<td>
 					<p class="forumtitle">
-						<img width="22" class="forumicon" title="{$thread.icon|ucfirst}" alt="{$thread.icon|ucfirst}" src="{$config.images_dir}/category.png">
+						<img width="22" class="forumicon" src="{$config.images_dir}/category.png">
 						<a href="{$forum.href}">{$forum.name}</a>
 						{$forum.links.rss}
 					</p>

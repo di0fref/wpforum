@@ -291,7 +291,6 @@ class AppBase
 			  is_solved bool default 0,
 			  solved_post_id varchar(36)  default '',
 			  user_id int(11) NOT NULL,
-			  sort_order int(11) default 0,
 			  sticky bool default 0,
 			  moved_from varchar(36) default '',
 			  PRIMARY KEY  (id),
@@ -354,6 +353,10 @@ class AppBase
 		wp_register_style('wpforum_bootstrap_styles_theme', plugins_url('assets/bootstrap-3.3.1/css/bootstrap-theme.min.css', __FILE__), array(), '3.3.1', 'all');
 		wp_register_style('wpforum_font_awsome', plugins_url('assets/font-awesome/css/font-awesome.min.css', __FILE__), array(), '', 'all');
 
+		wp_register_style('wysibb_css', "http://cdn.wysibb.com/css/default/wbbtheme.css", array(), '', 'all');
+		wp_enqueue_style('wysibb_css');
+
+
 		wp_enqueue_style('wpforum_styles');
 		wp_enqueue_style('wpforum_bootstrap_styles');
 		wp_enqueue_style('wpforum_bootstrap_styles_theme');
@@ -366,16 +369,16 @@ class AppBase
 		wp_register_script('bootstrap', plugins_url('assets/bootstrap-3.3.1/js/bootstrap.min.js', __FILE__), array("jquery"), '3.3.1', false);
 		wp_register_script('jquery_confirm', plugins_url('assets/js/jquery.confirm/jquery.confirm.min.js', __FILE__), array("jquery"), '', false);
 
-		wp_register_script('tinymce', plugins_url('assets/tinymce/tinymce.min.js', __FILE__), array(), '4.1.7', false);
+		wp_register_script("wysibb", "http://cdn.wysibb.com/js/jquery.wysibb.min.js", array("jquery"), "", false);
 
 		wp_enqueue_script('wpforum_script');
 		wp_enqueue_script('jquery_ui');
 		wp_enqueue_script('jquery_validate');
 		wp_enqueue_script('bootstrap');
-		wp_enqueue_script('tinymce');
+
+		wp_enqueue_script('wysibb');
 
 		wp_enqueue_script('jquery_confirm');
-
 
 		wp_localize_script('wpforum_script', 'forumAjax', array('ajaxurl' => admin_url('admin-ajax.php')));
 
