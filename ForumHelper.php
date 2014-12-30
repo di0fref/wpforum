@@ -203,9 +203,11 @@ class ForumHelper
 		}
 	}
 
-	function getPostsInThreadforRSS($thread_id)
+	function getThreadsInForumForRSS($forum_id)
 	{
-		$sql = "SELECT p.* FROM " . AppBase::$posts_table . " p left join " . AppBase::$threads_table . " t on t.id = p.parent_id WHERE p.parent_id='$thread_id' order by date limit 10";
+		$sql = "SELECT * FROM " . AppBase::$threads_table . " t
+			WHERE t.parent_id='$forum_id' order by date limit 4";
+
 		$url = "http" . (($_SERVER['SERVER_PORT'] == 443) ? "s://" : "://") . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 
 		$data = array(
@@ -213,6 +215,34 @@ class ForumHelper
 			"site_title" => get_bloginfo("name"),
 			"url" => htmlentities($url),
 			"description" => get_bloginfo("description"),
+			"forum" => $this->getForum($forum_id),
+		);
+		$data["threads"] = $this->db->get_results($sql, ARRAY_A);
+		foreach ($data["threads"] as &$thread) {
+
+			$post = $this->getFirstPost($thread["id"]);
+
+			$thread["text"] = $this->outPutFilter($post["text"]);
+			$thread["date"] = date("D, d M Y H:i:s T", strtotime($thread["date"]));;
+			$thread["user"] = $this->getUserDataFiltered($thread["user_id"]);
+			$thread["avatar"] = $this->getAvatar($thread["user"]->user_email, 22);
+			$thread["permalink"] = htmlentities($this->getLink(AppBase::THREAD_VIEW_ACTION, $thread["id"]));
+		}
+
+		return $data;
+	}
+
+	function getPostsInThreadForRSS($thread_id)
+	{
+		$sql = "SELECT p.* FROM " . AppBase::$posts_table . " p left join " . AppBase::$threads_table . " t on t.id = p.parent_id WHERE p.parent_id='$thread_id' order by date limit 50";
+		$url = "http" . (($_SERVER['SERVER_PORT'] == 443) ? "s://" : "://") . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+
+		$data = array(
+			"site_permalink" => site_url(),
+			"site_title" => get_bloginfo("name"),
+			"url" => htmlentities($url),
+			"description" => get_bloginfo("description"),
+			"thread" => $this->getThread($thread_id),
 		);
 
 		$data["posts"] = $this->db->get_results($sql, ARRAY_A);
@@ -315,7 +345,8 @@ class ForumHelper
 			$category["forums"] = array();
 			foreach ($this->getForumsInCategory($category["id"]) as $forum) {
 				$forum["href"] = self::getLink(AppBase::FORUM_VIEW_ACTION, $forum["id"]);
-				$category["forums"][] = $forum;
+				$category["forums"][$forum["id"]] = $forum;
+				$category["forums"][$forum["id"]]["links"]["rss"] = '<span class="pull-right"><a href="' . self::getLink(AppBase::RSS_FORUM_ACTION, $forum["id"]) . '" class="btn btn-link"><i class="fa fa-rss orange"></i>&nbsp;</a></span>';
 			}
 		}
 
@@ -357,6 +388,14 @@ class ForumHelper
 		return $result;
 	}
 
+	function getLastPostDate($thread_id)
+	{
+		$sql = "SELECT max(date) FROM " . AppBase::$posts_table . " WHERE parent_id = '$thread_id'";
+		$result = $this->db->get_var($sql);
+
+		return $result;
+	}
+
 	/*
 	* @param
 	* @return
@@ -374,25 +413,34 @@ class ForumHelper
 		if (!$threads) {
 			return false;
 		}
-
+		if (is_user_logged_in()) {
+			$lastVisit = $_COOKIE['lastVisit'];
+		}
 		foreach ($threads as &$thread) {
+
 			$nonce = wp_create_nonce("wpforum_ajax_nonce");
 			$thread["links"] = array();
 			if (current_user_can('manage_options')) {
-				$thread["links"]["delete"] = '<span class="pull-right"><button type="button" data-nonce="' . $nonce . '" data-thread-id="' . $thread["id"] . '" class="btn btn-danger btn-xs deletethread"><i class="fa fa-remove"></i> Delete</button></span>';
+				$thread["links"]["delete"] = '<span class="pull-right"><button type="button" data-nonce="' . $nonce . '" data-thread-id="' . $thread["id"] . '" class="btn btn-danger btn-xs deletethread"><i class="fa fa-trash"></i> Delete</button></span>';
 				$thread["links"]["move"] = '<span class="pull-right"><a href="' . self::getLink(AppBase::MOVE_THREAD_VIEW_ACTION, $thread["id"]) . '" type="button" class="btn btn-primary btn-xs movethread"><i class="fa fa-share"></i> Move</a></span>';
-
 			}
 			$thread["href"] = self::getLink(AppBase::THREAD_VIEW_ACTION, $thread["id"]);
+			if (is_user_logged_in()) {
+				$last_post = $this->getLastPostDate($thread["id"]);
+				$thread["is_new"] = ($last_post > $lastVisit) ? 1 : 0;
+
+				$thread["meta"]["last_post_date"] = $last_post;
+				$thread["meta"]["lastVisit"] = $lastVisit;
+				$thread["links"]["unread"] = '<span class="pull-right"><i class="fa fa-"></i></span>';
+
+			}
 			$thread["icon"] = self::getPng($thread);
 			$thread["user"] = $this->getUserDataFiltered($thread["user_id"]);
 			$thread["last_poster"] = $this->lastPoster($thread["id"]);
 			$thread["last_poster"]["avatar"] = $this->getAvatar($thread["last_poster"]["user_email"], 32, "left", "avatar-22");
 			$thread["prefix"] = $this->getThreadPrefix($thread);
-			if(is_user_logged_in())
-				$thread["links"]["rss"] = '<span class="pull-right"><a href="'.self::getLink(AppBase::RSS_THREAD_ACTION, $thread["id"]).'" class="btn btn-link"><i class="fa fa-rss-square orange"></i>&nbsp;</a></span>';
-
 		}
+
 		return $threads;
 	}
 
@@ -467,6 +515,12 @@ class ForumHelper
 	public function getPost($id)
 	{
 		$sql = "select * from " . AppBase::$posts_table . " where id = '{$id}'";
+		return $this->db->get_row($sql, ARRAY_A);
+	}
+
+	function getFirstPost($thread_id)
+	{
+		$sql = "select * from " . AppBase::$posts_table . " where parent_id = '{$thread_id}' and nr='1'";
 		return $this->db->get_row($sql, ARRAY_A);
 	}
 

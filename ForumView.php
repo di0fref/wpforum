@@ -149,13 +149,19 @@ class ForumView
 			$links[AppBase::EDIT_THREAD_VIEW_ACTION] = "";
 			$links[AppBase::MOVE_THREAD_VIEW_ACTION] = "";
 
-			$links[AppBase::FORUM_VIEW_ACTION]["buttons"]["new_thread"] = "<a data-forum-id='" . $this->record . "' class='btn btn-warning' href='" . ForumHelper::getLink(AppBase::NEW_THREAD_VIEW_ACTION, $this->record) . "'><i class='fa fa-plus'></i>&nbsp;Start Topic &nbsp;</a>";
-			$links[AppBase::FORUM_VIEW_ACTION]["tools"]["forum_rss"] = "<a data-forum-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::RSS_FORUM_ACTION, $this->record) . "'><i class='fa fa-rss-square orange'></i>&nbsp;RSS &nbsp;</a>";
-			$links[AppBase::THREAD_VIEW_ACTION]["buttons"]["new_post"] = "<a data-thread-id='" . $this->record . "' class='btn btn-warning' href='" . ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $this->record) . "'><i class='fa fa-reply'></i>&nbsp;Post reply &nbsp;</a>";
-
 			switch ($this->action) {
+				case AppBase::FORUM_VIEW_ACTION:
+					$links[AppBase::FORUM_VIEW_ACTION]["buttons"]["new_thread"] = "<a data-forum-id='" . $this->record . "' class='btn btn-warning' href='" . ForumHelper::getLink(AppBase::NEW_THREAD_VIEW_ACTION, $this->record) . "'><i class='fa fa-plus'></i>&nbsp;Start Topic &nbsp;</a>";
+					$links[AppBase::FORUM_VIEW_ACTION]["tools"]["new_thread"] = "<a data-forum-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::NEW_THREAD_VIEW_ACTION, $this->record) . "'><i class='fa fa-plus'></i>&nbsp;Start Topic &nbsp;</a>";
+					$links[AppBase::FORUM_VIEW_ACTION]["tools"]["forum_rss"] = "<a data-forum-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::RSS_FORUM_ACTION, $this->record) . "'><i class='fa fa-rss orange'></i>&nbsp;RSS Feed &nbsp;</a>";
+					break;
 				case AppBase::THREAD_VIEW_ACTION:
 					$thread = $this->helper->getThread($this->record);
+
+					$links[AppBase::THREAD_VIEW_ACTION]["buttons"]["new_post"] = "<a data-thread-id='" . $this->record . "' class='btn btn-warning' href='" . ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $this->record) . "'><i class='fa fa-reply'></i>&nbsp;Post reply &nbsp;</a>";
+					$links[AppBase::THREAD_VIEW_ACTION]["tools"]["new_post"] = "<a data-thread-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::NEW_POST_VIEW_ACTION, $this->record) . "'><i class='fa fa-reply'></i>&nbsp;Post reply &nbsp;</a>";
+					$links[AppBase::THREAD_VIEW_ACTION]["tools"]["thread_rss"] = '<a href="' . ForumHelper::getLink(AppBase::RSS_THREAD_ACTION, $thread["id"]) . '" class=""><i class="fa fa-rss orange"></i>&nbsp;RSS Feed &nbsp;</a></span>';
+
 					if ($current_user_id == $thread["user_id"] or current_user_can('manage_options')) {
 
 						$links[AppBase::THREAD_VIEW_ACTION]["tools"]["edit"] = "<a data-thread-id='" . $this->record . "' class='' href='" . ForumHelper::getLink(AppBase::EDIT_THREAD_VIEW_ACTION, $this->record) . "'><i class='fa fa-edit'></i>&nbsp;Edit &nbsp;</a>";
@@ -174,15 +180,13 @@ class ForumView
 					}
 					break;
 			}
-			$this->smarty->assign("buttons", $links[$this->action]);
 		} else {
 			$url = (isset($_SERVER['HTTPS']) ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-
 			$links[$this->action]["buttons"]["login"] = "<a class='btn btn-success' href='" . wp_login_url($url) . "'><i class='fa fa-key'></i>&nbsp;Login &nbsp;</a>";
 			$links[$this->action]["buttons"]["register"] = "<a class='btn btn-info' href='" . wp_registration_url() . "'><i class='fa fa-user'></i>&nbsp;Register &nbsp;</a>";
-
-			$this->smarty->assign("buttons", $links[$this->action]);
 		}
+		$this->smarty->assign("buttons", $links[$this->action]);
+
 	}
 
 	/*
@@ -209,18 +213,17 @@ class ForumView
 	public static function getThreadRSS()
 	{
 		$smarty = new Smarty();
-		$data = ForumHelper::getInstance()->getPostsInThreadforRSS($_REQUEST["record"]);
+		$data = ForumHelper::getInstance()->getPostsInThreadForRSS($_REQUEST["record"]);
 		$smarty->assign("data", $data);
-
 		return $smarty->fetch(WPFPATH . "/tpls" . "/rss_thread.xml");
 	}
 
 	public static function getForumRSS()
 	{
 		$smarty = new Smarty();
-		wp_die("TODO");
+		$data = ForumHelper::getInstance()->getThreadsInForumForRSS($_REQUEST["record"]);
+		$smarty->assign("data", $data);
 		return $smarty->fetch(WPFPATH . "/tpls" . "/rss_forum.xml");
-
 	}
 
 	/*

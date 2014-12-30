@@ -37,15 +37,15 @@
 				<td>
 					<p class="threadtitle">
 						<img width="22" class="forumicon" title="{$thread.icon|ucfirst}" alt="{$thread.icon|ucfirst}" src="{$config.images_dir}/{$thread.icon}.png">
-						{$thread.prefix}<a href="{$thread.href}">{$thread.subject}</a>
+						{if $thread.is_new}<b>{$thread.prefix}<a href="{$thread.href}">{$thread.subject}</a></b>{/if}
+						{if $thread.is_new eq 0}{$thread.prefix}<a href="{$thread.href}">{$thread.subject}</a>{/if}
 						{if isset($thread.links)}
 							{foreach from=$thread.links key=action item=link}
 								{$link}
 							{/foreach}
 						{/if}
 					</p>
-					<span class="small forumdescription">Started by: {$thread.user->display_name}
-						, {$thread.date|timesince}</span>
+					<span class="small forumdescription">Started by: {$thread.user->display_name}, {$thread.date|timesince}</span>
 				</td>
 				<td class="align-center">{$thread.post_replies|number_format:0}</td>
 				<td class="align-center">{$thread.views|number_format:0}</td>

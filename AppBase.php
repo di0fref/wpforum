@@ -349,8 +349,8 @@ class AppBase
 	{
 		wp_register_style('wpforum_styles', plugins_url('assets/styles/style.css', __FILE__), array(), '', 'all');
 		wp_register_style('jquery_ui_styles', plugins_url('assets/js/jquery-ui/jquery-ui.min.css', __FILE__), array(), '', 'all');
-		wp_register_style('wpforum_bootstrap_styles', plugins_url('assets/bootstrap-3.3.1/css/bootstrap.min.css', __FILE__), array(), '', 'all');
-		wp_register_style('wpforum_bootstrap_styles_theme', plugins_url('assets/bootstrap-3.3.1/css/bootstrap-theme.min.css', __FILE__), array(), '', 'all');
+		wp_register_style('wpforum_bootstrap_styles', plugins_url('assets/bootstrap-3.3.1/css/bootstrap.min.css', __FILE__), array(), '3.3.1', 'all');
+		wp_register_style('wpforum_bootstrap_styles_theme', plugins_url('assets/bootstrap-3.3.1/css/bootstrap-theme.min.css', __FILE__), array(), '3.3.1', 'all');
 		wp_register_style('wpforum_font_awsome', plugins_url('assets/font-awesome/css/font-awesome.min.css', __FILE__), array(), '', 'all');
 
 		wp_enqueue_style('wpforum_styles');
@@ -359,19 +359,21 @@ class AppBase
 		wp_enqueue_style('jquery_ui_styles');
 		wp_enqueue_style('wpforum_font_awsome');
 
-
-		wp_register_script('jquery_ui_js', plugins_url('assets/js/jquery-ui/jquery-ui.min.js', __FILE__), array("jquery"), '', false);
+		wp_register_script('jquery_ui', plugins_url('assets/js/jquery-ui/jquery-ui.min.js', __FILE__), array("jquery"), '', false);
 		wp_register_script('wpforum_script', plugins_url('assets/js/forum.js', __FILE__), array("jquery"), '', false);
-		wp_register_script('jquery_validate_js', plugins_url('assets/js/jquery.validate.min.js', __FILE__), array("jquery"), '', false);
-		wp_register_script('wpforum_bootstrap', plugins_url('assets/bootstrap-3.0.3/js/bootstrap.min.js', __FILE__), array("jquery"), '', false);
-		wp_register_script('jquery_confirm_js', plugins_url('assets/js/jquery.confirm/jquery.confirm.min.js', __FILE__), array("jquery"), '', false);
+		wp_register_script('jquery_validate', plugins_url('assets/js/jquery.validate.min.js', __FILE__), array("jquery"), '', false);
+		wp_register_script('bootstrap', plugins_url('assets/bootstrap-3.3.1/js/bootstrap.min.js', __FILE__), array("jquery"), '3.3.1', false);
+		wp_register_script('jquery_confirm', plugins_url('assets/js/jquery.confirm/jquery.confirm.min.js', __FILE__), array("jquery"), '', false);
+
+		wp_register_script('tinymce', plugins_url('assets/tinymce/tinymce.min.js', __FILE__), array(), '4.1.7', false);
 
 		wp_enqueue_script('wpforum_script');
-		wp_enqueue_script('jquery_ui_js');
-		wp_enqueue_script('jquery_validate_js');
-		wp_enqueue_script('wpforum_bootstrap');
+		wp_enqueue_script('jquery_ui');
+		wp_enqueue_script('jquery_validate');
+		wp_enqueue_script('bootstrap');
+		wp_enqueue_script('tinymce');
 
-		wp_enqueue_script('jquery_confirm_js');
+		wp_enqueue_script('jquery_confirm');
 
 
 		wp_localize_script('wpforum_script', 'forumAjax', array('ajaxurl' => admin_url('admin-ajax.php')));

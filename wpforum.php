@@ -128,14 +128,14 @@ add_action('wp_login', 'set_last_login');
 
 function set_last_login($login)
 {
+	$months = 60 * 60 * 24 * 60 + time();
 	$user = get_user_by("login", $login);
+	setcookie('lastVisit', get_last_login($user->ID), $months);
 	update_user_meta($user->ID, 'last_login', current_time('mysql'));
 }
 
 function get_last_login($user_id)
 {
 	$last_login = get_user_meta($user_id, 'last_login', true);
-	$date_format = get_option('date_format') . ' ' . get_option('time_format');
-	$the_last_login = mysql2date($date_format, $last_login, false);
-	return $the_last_login;
+	return $last_login;
 }

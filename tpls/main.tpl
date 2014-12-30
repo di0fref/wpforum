@@ -16,8 +16,8 @@
 			</ul>
 		</div>
 	{/if}
+	{* Buttons *}
 	{if isset($buttons.buttons)}
-		{* Buttons *}
 		{foreach from=$buttons.buttons item=button key=name}
 			{$button}
 		{/foreach}
@@ -37,7 +37,10 @@
 				<td>
 					<p class="forumtitle">
 						<img width="22" class="forumicon" title="{$thread.icon|ucfirst}" alt="{$thread.icon|ucfirst}" src="{$config.images_dir}/category.png">
-						<a href="{$forum.href}">{$forum.name}</a></p>
+						<a href="{$forum.href}">{$forum.name}</a>
+						{$forum.links.rss}
+					</p>
+
 					<span class="forumdescription small">{$forum.description}</span>
 				</td>
 				<td class="align-center">{$forum.thread_count|number_format:0}</td>
