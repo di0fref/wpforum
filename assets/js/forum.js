@@ -1,7 +1,8 @@
 jQuery(function ($) {
 
 	var settings = {
-		buttons: "bold,italic,underline,|,bullist,numlist,|,fontcolor,fontsize,quote,|,img,link,|,code"
+		buttons: "bold,italic,underline,|,bullist,numlist,|,fontcolor,fontsize,quote,|,img,link,|,code",
+		wbbdebug:0
 	};
 	$("#text").wysibb(settings);
 

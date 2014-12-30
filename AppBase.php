@@ -353,7 +353,7 @@ class AppBase
 		wp_register_style('wpforum_bootstrap_styles_theme', plugins_url('assets/bootstrap-3.3.1/css/bootstrap-theme.min.css', __FILE__), array(), '3.3.1', 'all');
 		wp_register_style('wpforum_font_awsome', plugins_url('assets/font-awesome/css/font-awesome.min.css', __FILE__), array(), '', 'all');
 
-		wp_register_style('wysibb_css', "http://cdn.wysibb.com/css/default/wbbtheme.css", array(), '', 'all');
+		wp_register_style('wysibb_css',plugins_url("assets/wysibb/theme/default/wbbtheme.css", __FILE__), array(), '', 'all');
 		wp_enqueue_style('wysibb_css');
 
 
@@ -369,7 +369,7 @@ class AppBase
 		wp_register_script('bootstrap', plugins_url('assets/bootstrap-3.3.1/js/bootstrap.min.js', __FILE__), array("jquery"), '3.3.1', false);
 		wp_register_script('jquery_confirm', plugins_url('assets/js/jquery.confirm/jquery.confirm.min.js', __FILE__), array("jquery"), '', false);
 
-		wp_register_script("wysibb", "http://cdn.wysibb.com/js/jquery.wysibb.min.js", array("jquery"), "", false);
+		wp_register_script("wysibb", plugins_url("assets/wysibb/jquery.wysibb.min.js", __FILE__), array("jquery"), "", false);
 
 		wp_enqueue_script('wpforum_script');
 		wp_enqueue_script('jquery_ui');
