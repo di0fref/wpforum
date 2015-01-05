@@ -6,16 +6,45 @@ label.error {
 	display: block;
 }
 
+.fa-danger:before {
+	content: "\f071";
+}
+
+.fa-success:before {
+	content: "\f00c";
+}
 ​
 .forum-table tr td.align-top {
 	vertical-align: top;
 }
 
+.fa-warning:before,
+.fa-info:before {
+	content: "\f05a" !important;
+}
+
+.row.no-gutters {
+	margin-right: 0;
+	margin-left: 0;
+}
+.row.no-gutters [class^="col-"],
+.row.no-gutters [class*=" col-"]{
+	padding-right: 0;
+	padding-left: 0;
+}
+.marginb{
+	margin-bottom: 15px;
+	overflow: visible !important;
+}
+.forum-menurow{
+}
 .forum-title {
 	font-size: 120%;
 	font-weight: bold;
 }
-
+.text-align-right{
+	text-align: right;
+}
 .forum-thread-image {
 	width: 35px;
 	height: 35px;
@@ -98,8 +127,9 @@ label.error {
 	background-position: -16.66666666% 0;
 }
 
-.forum-user-meta {
-	border-right: 1px solid #E0E0E0;
+.forum-post-text {
+	border-left: 1px solid #E0E0E0;
+
 }
 
 ._post-date {
@@ -204,10 +234,11 @@ div.bbcode_quote_head a:active {
 	box-shadow: none;
 }
 
-#forum-wrapper p.postpage_title{
+#forum-wrapper p.postpage_title {
 	font-size: 20px;
 	font-weight: 700;
 }
+
 #forum-wrapper p.postpage_title img {
 	vertical-align: top;
 }
@@ -235,29 +266,47 @@ div.bbcode_quote_head a:active {
 	overflow: hidden;
 }
 
-[class*="col-"] {
-	margin-bottom: -99999px;
-	padding-bottom: 99999px;
-}
-.pull-right .btn{
+.pull-right .btn {
 	margin-left: 5px;
 }
-.forum-top-menu{
-	margin-bottom: 10px;
-}
-small, .small {
-	font-size: 90% !important;
-}
-.orange{
-	color:orange;
-}
-.menu-row{
+
+.forum-top-menu {
 	margin-bottom: 10px;
 }
 
+small, .small {
+	font-size: 90% !important;
+}
+
+.orange {
+	color: orange;
+}
+
+.menu-row {
+	margin-bottom: 10px;
+	height: 40px;
+}
+
+.tool-menu {
+	margin-left: 10px;
+}
+
 /* Wrap code in a big blue box. */
-div.bbcode_code {padding: 8px; border: 1px solid #eee }
-div.bbcode_code_head { background-color: #ccc; color: white;
-	font-weight: bold; padding: 0.25em 0.5em; }
-div.bbcode_code_body { background-color: #fff; color: black;
-	font: 10pt monospace; padding: 0.5em 1em; }
+div.bbcode_code {
+	padding: 8px;
+	border: 1px solid #eee
+}
+
+div.bbcode_code_head {
+	background-color: #ccc;
+	color: white;
+	font-weight: bold;
+	padding: 0.25em 0.5em;
+}
+
+div.bbcode_code_body {
+	background-color: #fff;
+	color: black;
+	font: 10pt monospace;
+	padding: 0.5em 1em;
+}

@@ -10,7 +10,7 @@ define('WPFURL', WP_CONTENT_URL . '/plugins/' . WPFDIR . '/');
 
 
 /*
-* Class:
+* Class: AppBase
 * Author: Fredrik Fahlstad
 */
 
@@ -22,12 +22,15 @@ class AppBase
 	const POSTS = "wpforum_posts";
 	const USERS = "users";
 	const LIKES = "wpforum_likes";
-	//const USERS_THREADS = "wpforum_users_threads";
+	const TAGS_THREADS = "wpforum_tags_threads";
+	const TAGS = "wpforum_tags";
+
 
 	const FORUM_VIEW_ACTION = "viewforum";
 	const THREAD_VIEW_ACTION = "viewthread";
 	const NEW_THREAD_VIEW_ACTION = "newthread";
 	const NEW_POST_VIEW_ACTION = "newpost";
+	const SEARCH_VIEW_ACTION = "forumsearch";
 
 	const RSS_THREAD_ACTION = "threadrss";
 	const RSS_FORUM_ACTION = "forumrss";
@@ -43,24 +46,25 @@ class AppBase
 	const DELETE_THREAD_ACTION = "deletethread";
 	const MOVE_THREAD_VIEW_ACTION = "movethread";
 
-	const OPTION_DEFAULT_DATE_FORMAT = "%h %e, %Y %l:%S %p";
-
 	const RECORD = "record";
 	const APP_ACTION = "action";
 
-	const THREAD_PAGE_COUNT = 5;
-	const POST_PAGE_COUNT = 5;
 	const FORUM_PAGE = "fpage";
 	const FORUM_QUOTE = "quote";
 	const FORUM_POST = "fpost";
 
 	const TRAIL_SEPARATOR = " / ";
 	const WPFORUM_INSERT_NONCE = "wpforum_insert_nonce";
+	const WPFORUM_USER_LAST_POST_TIME = "wpforum_user_last_post_time";
 
 	/* Options */
 	const OPTION_DATE_FORMAT = "wpforum_option_date_format";
 	const OPTION_THREADS_VIEW_COUNT = "wpforum_option_threads_view_count";
 	const OPTION_POSTS_VIEW_COUNT = "wpforum_option_posts_view_count";
+	const OPTION_POST_THROTTLE_SECONDS = "wpforum_post_throttle_seconds";
+	const OPTION_DISPLAY_PAGINATION_TOP = "wpforum_display_pagination_top";
+	const OPTION_DEFAULT_DATE_FORMAT = "%h %e, %Y %l:%S %p";
+
 
 	static $border = 0;
 
@@ -70,6 +74,8 @@ class AppBase
 	static $posts_table;
 	static $users_table;
 	static $likes_table;
+	static $tags_threads_table;
+	static $tags_table;
 	//static $users_threads_table;
 
 	protected $action;
@@ -86,6 +92,8 @@ class AppBase
 		self::$posts_table = $table_prefix . self::POSTS;
 		self::$users_table = $table_prefix . self::USERS;
 		self::$likes_table = $table_prefix . self::LIKES;
+		self::$tags_threads_table = $table_prefix . self::TAGS_THREADS;
+		self::$tags_table = $table_prefix . self::TAGS;
 
 	}
 
@@ -99,11 +107,11 @@ class AppBase
 		self::MARK_SOLVED_ACTION
 	);
 
-	function avtivation()
+	function activation()
 	{
-		update_option(self::OPTION_DATE_FORMAT, self::OPTION_DEFAULT_DATE_FORMAT);
-		update_option(self::OPTION_THREADS_VIEW_COUNT, 20);
-		update_option(self::OPTION_POSTS_VIEW_COUNT, 20);
+		add_option(self::OPTION_DATE_FORMAT, self::OPTION_DEFAULT_DATE_FORMAT);
+		add_option(self::OPTION_THREADS_VIEW_COUNT, 20);
+		add_option(self::OPTION_POSTS_VIEW_COUNT, 20);
 	}
 
 	public function main($content)
@@ -158,21 +166,23 @@ class AppBase
 				}
 				break;
 			case self::EDIT_POST_VIEW_ACTION:
-				if (is_user_logged_in()) {
+				$post = ForumHelper::getInstance()->getPost($this->record);
+				if ((is_user_logged_in() and $post["user_id"] == get_current_user_id()) or current_user_can('manage_options')) {
 					$data = $view->getEditPostView();
 				} else {
-					$data = $view->permission(self::NEW_POST_VIEW_ACTION);
+					$data = $view->permission(self::EDIT_POST_VIEW_ACTION);
 				}
 				break;
 			case self::EDIT_THREAD_VIEW_ACTION:
-				if (is_user_logged_in()) {
+				$thread = ForumHelper::getInstance()->getThread($this->record);
+				if ((is_user_logged_in() and $thread["user_id"] == get_current_user_id()) or current_user_can('manage_options')) {
 					$data = $view->getEditThreadView();
 				} else {
 					$data = $view->permission(self::EDIT_THREAD_VIEW_ACTION);
 				}
 				break;
 			case self::MOVE_THREAD_VIEW_ACTION:
-				if (is_user_logged_in()) {
+				if (current_user_can('manage_options')) {
 					$data = $view->getMoveThreadView();
 				} else {
 					$data = $view->permission(self::MOVE_THREAD_VIEW_ACTION);
@@ -181,8 +191,11 @@ class AppBase
 			case self::MAIN_VIEW_ACTION:
 				$data = $view->getMainView();
 				break;
+			case self::SEARCH_VIEW_ACTION:
+				$data = $view->getSearchView();
+				break;
 			default:
-				wp_die("Error!");
+				wp_die("No Such Action!");
 		}
 
 		$header = $this->getHeader();
@@ -202,10 +215,10 @@ class AppBase
 	{
 		switch ($this->action) {
 			case AppBase::FORUM_VIEW_ACTION:
-				$count = AppBase::THREAD_PAGE_COUNT;
+				$count = get_option(AppBase::OPTION_THREADS_VIEW_COUNT);
 				break;
 			case AppBase::THREAD_VIEW_ACTION:
-				$count = AppBase::POST_PAGE_COUNT;
+				$count = get_option(AppBase::OPTION_POSTS_VIEW_COUNT);
 				break;
 			default:
 				$count = 0;
@@ -220,9 +233,23 @@ class AppBase
 
 	public function getHeader()
 	{
+		return "";
 	}
 
 	public function getFooter()
+	{
+		$out = "";
+		/*if (!empty($this->action)) {
+			$out .= '<div style="text-align:right"><ul class="pagination pagination-sm">';
+
+			$out .= paginate(get_permalink() . "?" . AppBase::APP_ACTION . "=" . $this->action . "&record={$this->record}", $this->page, ForumHelper::getTotalPages($this->action, $this->record));
+			$out .= "</ul></div>";
+		}*/
+		$out .= '<div id="forum-dialog" title="Dialog">';
+		return $out;
+	}
+
+	function getPagination()
 	{
 		$out = "";
 		if (!empty($this->action)) {
@@ -231,7 +258,6 @@ class AppBase
 			$out .= paginate(get_permalink() . "?" . AppBase::APP_ACTION . "=" . $this->action . "&record={$this->record}", $this->page, ForumHelper::getTotalPages($this->action, $this->record));
 			$out .= "</ul></div>";
 		}
-		$out .= '<div id="forum-dialog" title="Dialog">';
 		return $out;
 	}
 
@@ -258,6 +284,11 @@ class AppBase
 	*/
 	public function install()
 	{
+		add_option(self::OPTION_DATE_FORMAT, self::OPTION_DEFAULT_DATE_FORMAT);
+		add_option(self::OPTION_THREADS_VIEW_COUNT, 20);
+		add_option(self::OPTION_POSTS_VIEW_COUNT, 20);
+		add_option(self::OPTION_POST_THROTTLE_SECONDS, 10);
+		add_option(self::OPTION_DISPLAY_PAGINATION_TOP, 1);
 
 		$categories_sql = "
 			CREATE TABLE IF NOT EXISTS " . self::$categories_table . " (
@@ -311,6 +342,24 @@ class AppBase
 			  INDEX parent_idx (parent_id),
 			  INDEX user_idx (user_id)
 			);";
+
+		$tags = "
+					CREATE TABLE IF NOT EXISTS " . self::$tags_table . " (
+					  id varchar(36) NOT NULL default '',
+					  tag_name varchar(36) NOT NULL default '',
+					  PRIMARY KEY  (id),
+					  INDEX tag_idx (tag_name)
+					  )";
+
+		$tags_threads = "CREATE TABLE IF NOT EXISTS " . self::$tags_threads_table . " (
+						id varchar(36) NOT NULL default '',
+					  tag_id varchar(36) NOT NULL default '',
+					  thread_id varchar(36) NOT NULL default '',
+					  PRIMARY KEY  (id),
+					  INDEX tag_idx (tag_id),
+					  INDEX thread_idx (thread_id)
+					  )";
+
 		/*
 				$likes_sql = "
 					CREATE TABLE IF NOT EXISTS " . self::$likes_table . " (
@@ -328,6 +377,8 @@ class AppBase
 		dbDelta($forums_sql);
 		dbDelta($threads_sql);
 		dbDelta($posts_sql);
+		dbDelta($tags);
+		dbDelta($tags_threads);
 //		dbDelta($likes_sql);
 
 	}
@@ -353,9 +404,9 @@ class AppBase
 		wp_register_style('wpforum_bootstrap_styles_theme', plugins_url('assets/bootstrap-3.3.1/css/bootstrap-theme.min.css', __FILE__), array(), '3.3.1', 'all');
 		wp_register_style('wpforum_font_awsome', plugins_url('assets/font-awesome/css/font-awesome.min.css', __FILE__), array(), '', 'all');
 
-		wp_register_style('wysibb_css',plugins_url("assets/wysibb/theme/default/wbbtheme.css", __FILE__), array(), '', 'all');
-		wp_enqueue_style('wysibb_css');
+		wp_register_style('boostrap_tags_css', plugins_url('assets/bootstrap-tagsinput/bootstrap-tagsinput.css', __FILE__), array(), '', 'all');
 
+		wp_enqueue_style('boostrap_tags_css');
 
 		wp_enqueue_style('wpforum_styles');
 		wp_enqueue_style('wpforum_bootstrap_styles');
@@ -363,20 +414,27 @@ class AppBase
 		wp_enqueue_style('jquery_ui_styles');
 		wp_enqueue_style('wpforum_font_awsome');
 
-		wp_register_script('jquery_ui', plugins_url('assets/js/jquery-ui/jquery-ui.min.js', __FILE__), array("jquery"), '', false);
-		wp_register_script('wpforum_script', plugins_url('assets/js/forum.js', __FILE__), array("jquery"), '', false);
-		wp_register_script('jquery_validate', plugins_url('assets/js/jquery.validate.min.js', __FILE__), array("jquery"), '', false);
+		wp_register_script('jquery_ui', plugins_url('assets/js/jquery-ui/jquery-ui.min.js', __FILE__), array("jquery"), '1.11.2', false);
+		wp_register_script('wpforum_script', plugins_url('assets/js/forum.js', __FILE__), array("jquery"), '1.0', false);
+		wp_register_script('jquery_validate', plugins_url('assets/js/jquery.validate.min.js', __FILE__), array("jquery"), '1.13.1', false);
 		wp_register_script('bootstrap', plugins_url('assets/bootstrap-3.3.1/js/bootstrap.min.js', __FILE__), array("jquery"), '3.3.1', false);
-		wp_register_script('jquery_confirm', plugins_url('assets/js/jquery.confirm/jquery.confirm.min.js', __FILE__), array("jquery"), '', false);
+		wp_register_script('jquery_confirm', plugins_url('assets/js/jquery.confirm/jquery.confirm.min.js', __FILE__), array("jquery"), '2.3.1', false);
 
-		wp_register_script("wysibb", plugins_url("assets/wysibb/jquery.wysibb.min.js", __FILE__), array("jquery"), "", false);
+		wp_register_script('boostrap_tags', plugins_url('assets/bootstrap-tagsinput/bootstrap-tagsinput.js', __FILE__), array("jquery"), '2.3.1', false);
+		wp_register_script('boostrap_angular_tags', plugins_url('assets/bootstrap-tagsinput/bootstrap-tagsinput-angular.js', __FILE__), array("jquery"), '2.3.1', false);
+		wp_register_script('angular', plugins_url('assets/bootstrap-tagsinput/angular.min.js', __FILE__), array(), '', false);
+
+
+		wp_enqueue_script('boostrap_tags');
+		wp_enqueue_script('angular');
+		wp_enqueue_script('boostrap_angular_tags');
+
 
 		wp_enqueue_script('wpforum_script');
 		wp_enqueue_script('jquery_ui');
 		wp_enqueue_script('jquery_validate');
 		wp_enqueue_script('bootstrap');
 
-		wp_enqueue_script('wysibb');
 
 		wp_enqueue_script('jquery_confirm');
 
@@ -386,19 +444,36 @@ class AppBase
 
 	function preHeader()
 	{
+		$user_id = get_current_user_id();
+		$throttled = false;
+		/* Make sure we have a session */
+		if (!session_id()) {
+			session_start();
+		}
+
+		if (isset($_REQUEST[self::APP_ACTION]) and $_REQUEST[self::APP_ACTION] == self::POST_VIEW_ACTION) {
+			self::checkParams($_REQUEST[self::RECORD], "guid");
+			$page_offset = ForumHelper::getInstance()->getPageOffsetForPost($_REQUEST[self::RECORD]);
+			$post = ForumHelper::getInstance()->getPost($_REQUEST[self::RECORD]);
+			$thread = ForumHelper::getInstance()->getThread($post["parent_id"]);
+			$link = ForumHelper::getLink(self::THREAD_VIEW_ACTION, $thread["id"], array(AppBase::FORUM_PAGE, $page_offset . "#post-{$post["id"]}"));
+			wp_redirect($link);
+			exit;
+		}
+
 		/* RSS Feed hook*/
-		if(isset($_REQUEST[self::APP_ACTION]) and $_REQUEST[self::APP_ACTION] == self::RSS_THREAD_ACTION){
+		if (isset($_REQUEST[self::APP_ACTION]) and $_REQUEST[self::APP_ACTION] == self::RSS_THREAD_ACTION) {
 			header('Content-Type: text/xml; charset=UTF-8');
 			die(ForumView::getThreadRSS());
 		}
 		/* RSS Feed hook*/
-		if(isset($_REQUEST[self::APP_ACTION]) and $_REQUEST[self::APP_ACTION] == self::RSS_FORUM_ACTION){
+		if (isset($_REQUEST[self::APP_ACTION]) and $_REQUEST[self::APP_ACTION] == self::RSS_FORUM_ACTION) {
 			header('Content-Type: text/xml; charset=UTF-8');
 			die(ForumView::getForumRSS());
 		}
 		/* Processing forms */
 
-		/* New thread */
+		/* Move thread */
 		if (isset($_POST["forum-form-move-thread"])) {
 			if (!current_user_can('manage_options')) {
 				wp_die("No naughty business please");
@@ -411,11 +486,16 @@ class AppBase
 
 		/* New thread */
 		if (isset($_POST["forum-form-new-thread"])) {
+
+			/* Check for throttling */
+			ForumHelper::checkThrottle($user_id);
+
 			if (!is_user_logged_in()) {
 				wp_die("No naughty business please");
 			}
 			self::verifyNonce(self::WPFORUM_INSERT_NONCE);
 			include("AddThread.php");
+			ForumHelper::updateUserLastPostTime($user_id);
 			header("Location:" . $redirect_url);
 			exit();
 		}
@@ -429,14 +509,19 @@ class AppBase
 			header("Location:" . $redirect_url);
 			exit();
 		}
+
 		/* Post reply*/
 		if (isset($_POST["forum-form-new-post"])) {
+
+			/* Check for throttling */
+			ForumHelper::checkThrottle($user_id);
+
 			if (!is_user_logged_in()) {
 				wp_die("No naughty business please");
 			}
 			self::verifyNonce(self::WPFORUM_INSERT_NONCE);
 			include("AddPost.php");
-
+			ForumHelper::updateUserLastPostTime($user_id);
 			$this->notifyThreadStarter($thread_id, $post_id);
 
 			header("Location:" . $redirect_url);
@@ -453,6 +538,7 @@ class AppBase
 			header("Location:" . $redirect_url);
 			exit();
 		}
+
 	}
 
 	public static function verifyNonce($nonce)
@@ -483,67 +569,6 @@ class AppBase
 	}
 }
 
-
-function _paginate($reload, $page, $tpages)
-{
-	$data = array();
-	$delim = "&";
-	if ($tpages > 1) {
-
-		if (empty($page)) $page = 1;
-
-		$adjacents = 4;
-		$prevlabel = "&lsaquo; Prev";
-		$nextlabel = "Next &rsaquo;";
-		$out = "";
-		// previous
-		if ($page == 1) {
-			//$data[] = "<span style='white-space:nowrap'>" . $prevlabel . "</span>\n";
-			$data[] = $prevlabel;
-		} elseif ($page == 2) {
-			//$data[] = "<li style='white-space:nowrap'><a  href=\"" . $reload . "\">" . $prevlabel . "</a>\n</li>";
-			$data[] = "<a  href=\"" . $reload . "\">" . $prevlabel . "</a>";
-		} else {
-			//$data[] = "<li style='white-space:nowrap'><a  href=\"" . $reload . "$delim".AppBase::FORUM_PAGE."=" . ($page - 1) . "\">" . $prevlabel . "</a>\n</li>";
-			$data[] = "<a  href=\"" . $reload . "$delim" . AppBase::FORUM_PAGE . "=" . ($page - 1) . "\">" . $prevlabel . "</a>";
-		}
-		$pmin = ($page > $adjacents) ? ($page - $adjacents) : 1;
-		$pmax = ($page < ($tpages - $adjacents)) ? ($page + $adjacents) : $tpages;
-		for ($i = $pmin; $i <= $pmax; $i++) {
-			if ($i == $page) {
-				//$data[] = "<li  class=\"active\"><a href=''>" . $i . "</a></li>\n";
-				$data[] = "<li  class=\"active\"><a class='active' href=''>" . $i . "</a></li>\n";
-			} elseif ($i == 1) {
-				//$data[] = "<li><a  href=\"" . $reload . "\">" . $i . "</a>\n</li>";
-				$data[] = "<a  href=\"" . $reload . "\">" . $i . "</a>";
-			} else {
-				//$data[] = "<li><a  href=\"" . $reload . "$delim".AppBase::FORUM_PAGE."=" . $i . "\">" . $i . "</a>\n</li>";
-				$data[] = "<a  href=\"" . $reload . "$delim" . AppBase::FORUM_PAGE . "=" . $i . "\">" . $i . "</a>";
-			}
-		}
-
-		if ($page < ($tpages - $adjacents)) {
-			//$data[] = "<a style='font-size:11px' href=\"" . $reload . "$delim".AppBase::FORUM_PAGE."=" . $tpages . "\">" . $tpages . "</a>\n";
-			$data[] = "<a style='font-size:11px' href=\"" . $reload . "$delim" . AppBase::FORUM_PAGE . "=" . $tpages . "\">" . $tpages . "</a>\n";
-
-		}
-		// next
-		if ($page < $tpages) {
-			//$data[] = "<li style='white-space:nowrap'><a  href=\"" . $reload . "$delim".AppBase::FORUM_PAGE."=" . ($page + 1) . "\">" . $nextlabel . "</a>\n</li>";
-			$data[] = "<a  href=\"" . $reload . "$delim" . AppBase::FORUM_PAGE . "=" . ($page + 1) . "\">" . $nextlabel . "</a>";
-
-		} else {
-			//$data[] = "<span style='font-size:11px white-space:nowrap'>" . $nextlabel . "</span>\n";
-			$data[] = "<span style='font-size:11px white-space:nowrap'>" . $nextlabel . "</span>\n";
-		}
-		echo "<pre>";
-		print_r($data);
-		echo "</pre>";
-		//$out .= "";
-		return $out;
-	}
-
-}
 
 function paginate($reload, $page, $tpages)
 {

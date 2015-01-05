@@ -93,6 +93,23 @@ class ForumHelper
 		return $result;
 	}
 
+	function getPageOffsetForPost($id)
+	{
+		$post1 = $this->getPost($id);
+		$posts = $this->getPosts($post1["parent_id"]);
+		$posts_per_page = get_option(AppBase::OPTION_POSTS_VIEW_COUNT);
+
+		$post_number = 0;
+		foreach ($posts as $post) {
+			$post_number++;
+			if ($post["id"] == $id) {
+				break;
+			}
+		}
+
+		return ceil($post_number / $posts_per_page);
+	}
+
 	/*
 	* @param
 	* @return
@@ -102,11 +119,11 @@ class ForumHelper
 		global $wpdb;
 		switch ($action) {
 			case AppBase::FORUM_VIEW_ACTION:
-				$per_page = AppBase::THREAD_PAGE_COUNT;
+				$per_page = get_option(AppBase::OPTION_THREADS_VIEW_COUNT);
 				$table = AppBase::$threads_table;
 				break;
 			case AppBase::THREAD_VIEW_ACTION:
-				$per_page = AppBase::POST_PAGE_COUNT;
+				$per_page = get_option(AppBase::OPTION_POSTS_VIEW_COUNT);
 				$table = AppBase::$posts_table;
 				break;
 			default:
@@ -172,15 +189,19 @@ class ForumHelper
 	* @param
 	* @return
 	*/
-	public static function getLink($action, $record, $additional_params = "")
+	public static function getLink($action, $record = "", $additional_params = "")
 	{
 		global $wp_rewrite;
 		$delim = ($wp_rewrite->using_permalinks()) ? "?" : "&";
 
 		$link_base = array(
 			AppBase::APP_ACTION => $action,
-			AppBase::RECORD => $record,
 		);
+
+		if (!empty($record)) {
+			$link_base[AppBase::RECORD] = $record;
+
+		}
 
 		if (is_array($additional_params)) {
 			$link_base[$additional_params[0]] = $additional_params[1];
@@ -271,7 +292,12 @@ class ForumHelper
 			return false;
 		}
 		$thread = $this->getThread($record);
+		$posts["tags"] = $this->getTags($thread["id"]);
+
 		foreach ($posts["posts"] as &$post) {
+
+			$post["page_offset"] = $this->getPageOffsetForPost($post["id"]);
+
 			$post["text"] = $this->outPutFilter($post["text"]);
 			$post["user"] = $this->getUserDataFiltered($post["user_id"]);
 			$post["avatar"] = $this->getAvatar($post["user"]->user_email, 65);
@@ -339,17 +365,18 @@ class ForumHelper
 		$categories = $this->db->get_results($sql, ARRAY_A);
 
 		if (!$categories) {
-			return false;
+			return array();
 		}
 		foreach ($categories as &$category) {
 			$category["forums"] = array();
 			foreach ($this->getForumsInCategory($category["id"]) as $forum) {
 				$forum["href"] = self::getLink(AppBase::FORUM_VIEW_ACTION, $forum["id"]);
 				$category["forums"][$forum["id"]] = $forum;
-				$category["forums"][$forum["id"]]["links"]["rss"] = '<span class="pull-right"><a href="' . self::getLink(AppBase::RSS_FORUM_ACTION, $forum["id"]) . '" class="btn btn-link"><i class="fa fa-rss orange"></i>&nbsp;</a></span>';
+				if (is_user_logged_in()) {
+					$category["forums"][$forum["id"]]["links"]["rss"] = '<span class="pull-right"><a href="' . self::getLink(AppBase::RSS_FORUM_ACTION, $forum["id"]) . '" class="btn btn-link"><i class="fa fa-rss orange"></i>&nbsp;</a></span>';
+				}
 			}
 		}
-
 		return $categories;
 	}
 
@@ -368,6 +395,40 @@ class ForumHelper
 		if (!$result) {
 			return array();
 		}
+		return $result;
+	}
+
+	/*
+		* @param
+		* @return
+		*/
+	public function getForums($catid = "")
+	{
+		$add_sql = "";
+		if ($catid) {
+			$add_sql = " WHERE parent_id = '$catid' ";
+		}
+		$sql = "select * from " . AppBase::$forums_table . " f
+				$add_sql  order by f.sort_order";
+		$result = $this->db->get_results($sql, ARRAY_A);
+		if (!$result) {
+			return array();
+		}
+
+		return $result;
+	}
+
+	/*
+	* @param
+	* @return
+	*/
+	public function getThreads($forum_id)
+	{
+		$sql = "select * from " . AppBase::$threads_table . " WHERE parent_id='$forum_id' order by date";
+		$result = $this->db->get_results($sql, ARRAY_A);
+		if (!$result) {
+			return array();
+		}
 
 		return $result;
 	}
@@ -376,10 +437,9 @@ class ForumHelper
 		* @param
 		* @return
 		*/
-	public function getForums()
+	public function getPosts($thread_id)
 	{
-		$sql = "select * from " . AppBase::$forums_table . " f
-				 order by f.sort_order";
+		$sql = "select * from " . AppBase::$posts_table . " WHERE parent_id='$thread_id' order by date";
 		$result = $this->db->get_results($sql, ARRAY_A);
 		if (!$result) {
 			return array();
@@ -408,7 +468,9 @@ class ForumHelper
 			left join " . AppBase::$posts_table . " p on t.id = p.parent_id
 				where t.parent_id = '$forum_id'
 			group by t.id order by (sticky = '1') DESC, last_post DESC $limit_query";
-		$threads = $this->db->get_results($sql, ARRAY_A);
+		$threads["threads"] = $this->db->get_results($sql, ARRAY_A);
+
+		$threads["forum"] = $this->getForum($forum_id);
 
 		if (!$threads) {
 			return false;
@@ -417,7 +479,7 @@ class ForumHelper
 		if (is_user_logged_in() and isset($_COOKIE['lastVisit'])) {
 			$lastVisit = $_COOKIE['lastVisit'];
 		}
-		foreach ($threads as &$thread) {
+		foreach ($threads["threads"] as &$thread) {
 
 			$nonce = wp_create_nonce("wpforum_ajax_nonce");
 			$thread["links"] = array();
@@ -436,13 +498,27 @@ class ForumHelper
 				$thread["links"]["unread"] = '<span class="pull-right"><i class="fa fa-"></i></span>';
 
 			}
+			//$thread["tags"] = $this->getTags($thread["id"]);
 			$thread["icon"] = self::getPng($thread);
 			$thread["user"] = $this->getUserDataFiltered($thread["user_id"]);
 			$thread["last_poster"] = $this->lastPoster($thread["id"]);
 			$thread["last_poster"]["avatar"] = $this->getAvatar($thread["last_poster"]["user_email"], 32, "left", "avatar-22");
 			$thread["prefix"] = $this->getThreadPrefix($thread);
 		}
+		if (current_user_can('manage_options')) {
+			$threads["is_admin"] = true;
+		}
 		return $threads;
+	}
+
+	function getThreadMeta($id)
+	{
+		$sql = "select t.*, count(distinct(p.id))-1 as replies, max(p.date) as last_post from " . AppBase::$threads_table . " t
+			left join " . AppBase::$posts_table . " p on t.id = p.parent_id
+				where t.id = '$id'";
+
+		$result = $this->db->get_row($sql, ARRAY_A);
+		return $result;
 	}
 
 	function getAvatar($email, $size, $align = "", $class = "")
@@ -714,6 +790,274 @@ class ForumHelper
 		}
 
 		return $d;
+	}
+
+	public function getStatusDD($selected)
+	{
+		$dd = "";
+		$statuses = array(
+			"open" => "Open",
+			"closed" => "Closed"
+		);
+		foreach ($statuses as $key => $val) {
+			$s = "";
+			if ($selected == $key) {
+				$s = "selected";
+			}
+			$dd .= "<option value='$key' $s>$val</option>";
+		}
+
+
+		return $dd;
+	}
+
+	function getMessages()
+	{
+		global $_SESSION;
+		if (isset($_SESSION["wpforum"]["messages"])) {
+			return $_SESSION["wpforum"]["messages"];
+		}
+		return false;
+	}
+
+	/*
+	* @param
+	* @return
+	*/
+	public function clearMessages()
+	{
+		global $_SESSION;
+		unset($_SESSION["wpforum"]["messages"]);
+	}
+
+	function addMessage($message, $level)
+	{
+		global $_SESSION;
+		$_SESSION["wpforum"]["messages"][] = array(
+			"text" => $message,
+			"level" => $level,
+		);
+	}
+
+	function cleanInput($input)
+	{
+		$search = array(
+			'@<script[^>]*?>.*?</script>@si',   // Strip out javascript
+			'@<[\/\!]*?[^<>]*?>@si',            // Strip out HTML tags
+			'@<style[^>]*?>.*?</style>@siU',    // Strip style tags properly
+			'@<![\s\S]*?--[ \t\n\r]*>@'         // Strip multi-line comments
+		);
+
+		$output = preg_replace($search, '', $input);
+		return $output;
+	}
+
+	function sanitize($input)
+	{
+		if (is_array($input)) {
+			foreach ($input as $var => $val) {
+				$output[$var] = $this->sanitize($val);
+			}
+		} else {
+			if (get_magic_quotes_gpc()) {
+				$input = stripslashes($input);
+			}
+			$input = $this->cleanInput($input);
+			$output = mysql_real_escape_string($input);
+		}
+		return $output;
+	}
+
+	function getTagResults()
+	{
+		$tag = $this->sanitize($_REQUEST["tag"]);
+		$results = array();
+
+		$sql = "SELECT threads.*, tags.id as tag_id, tags.tag_name as tag_name
+			FROM " . AppBase::$threads_table . " threads
+			LEFT JOIN " . AppBase::$tags_threads_table . " tags_threads
+				ON threads.id = tags_threads.thread_id
+			LEFT JOIN " . AppBase::$tags_table . " tags on tags.id = tags_threads.tag_id
+			WHERE tags.tag_name = '$tag'";
+
+		$results["results"] = $this->db->get_results($sql, ARRAY_A);
+		$results["link_back"] = self::getLink(AppBase::SEARCH_VIEW_ACTION);
+		foreach ($results["results"] as &$result) {
+			$first_post = $this->getFirstPost($result["id"]);
+			$result["date"] = strftime(get_option(AppBase::OPTION_DATE_FORMAT), strtotime($result["date"]));
+			$result["user"] = $this->getUserDataFiltered($result["user_id"]);
+			$result["text"] = $this->outPutFilter($first_post["text"]);
+			$result["meta"] = $this->getThreadMeta($result["parent_id"]);
+			$result["link"] = self::getLink(AppBase::POST_VIEW_ACTION, $result["id"]);
+			$results["tags"] = $this->getTags($result["id"]);
+		}
+
+		return $results;
+	}
+
+	function getSearchResults()
+	{
+		global $wpdb;
+		$results = array();
+		$results["link_back"] = self::getLink(AppBase::SEARCH_VIEW_ACTION);
+
+		if (strlen($_REQUEST["search_term"]) < 3) {
+			$results["error"] = "Search string need to be at least 3 characters long";
+			return $results;
+		}
+
+		$table = AppBase::$posts_table;
+		$column = "";
+
+		$term = array($this->sanitize($_REQUEST["search_term"]) . "%");
+		$sterm = $this->sanitize($_REQUEST["search_term"]);
+		/* What are we searching in? */
+		switch ($_REQUEST["search_criteria"]) {
+			case "titles":
+				$column = "subject";
+				break;
+			case "posts":
+				$column = "text";
+				break;
+			default:
+				wp_die();
+		}
+		$where = "";
+
+		if (!empty($_REQUEST["search_start_date"])) {
+			$where .= " AND date >= %s";
+		}
+		if (!empty($_REQUEST["search_end_date"])) {
+			$where .= " AND date <= %s";
+		}
+
+		$sql = "SELECT * from $table where $column LIKE %s" . $where . " order by date ";
+
+		if (!empty($_REQUEST["search_start_date"])) {
+			$term[] = $_REQUEST["search_start_date"];
+		}
+		if (!empty($_REQUEST["search_end_date"])) {
+			$term[] = $_REQUEST["search_end_date"];
+		}
+
+		$sql = $wpdb->prepare($sql, $term);
+		$results["results"] = $this->db->get_results($sql, ARRAY_A);
+
+		foreach ($results["results"] as &$result) {
+			$result["date"] = strftime(get_option(AppBase::OPTION_DATE_FORMAT), strtotime($result["date"]));
+			$result["user"] = $this->getUserDataFiltered($result["user_id"]);
+			$result["text"] = $this->outPutFilter($result["text"]);
+			$result["meta"] = $this->getThreadMeta($result["parent_id"]);
+			$result["text"] = preg_replace("/$sterm/i", '<mark>$0</mark>', $result["text"]);
+			$result["link"] = self::getLink(AppBase::POST_VIEW_ACTION, $result["id"]);
+			$results["tags"] = $this->getTags($result["id"]);
+		}
+		return $results;
+	}
+
+	public static function updateUserLastPostTime($user_id)
+	{
+		update_user_option($user_id, AppBase::WPFORUM_USER_LAST_POST_TIME, date("Y-m-d H:i:s"));
+	}
+
+	public static function checkThrottle($user_id)
+	{
+		$last_post = get_user_option(AppBase::WPFORUM_USER_LAST_POST_TIME, $user_id);
+		$throttle = get_option(AppBase::OPTION_POST_THROTTLE_SECONDS);
+
+		if ((time() - strtotime($last_post)) < $throttle) {
+			ForumHelper::getInstance()->addMessage("System throttled, slow down posting rate please.", "danger");
+			wp_redirect(ForumHelper::getLink(AppBase::MAIN_VIEW_ACTION));
+			exit();
+		}
+	}
+
+
+	public function getTags($thread_id, $link = true)
+	{
+		$data = array();
+		$sql = "SELECT tag_name
+			FROM " . AppBase::$tags_table . " t
+			LEFT JOIN " . AppBase::$tags_threads_table . " tt
+			ON tt.tag_id=t.id WHERE tt.thread_id = '$thread_id'";
+		$results = $this->db->get_results($sql, ARRAY_A);
+
+		foreach ($results as $result) {
+			if ($link) {
+				$data[] = "<a href='" . self::getLink(AppBase::SEARCH_VIEW_ACTION, "", array("tag", $result["tag_name"])) . "'>" . $result["tag_name"] . "</a>";
+			} else {
+				$data[] = $result["tag_name"];
+			}
+		}
+
+		return $data;
+
+	}
+
+	public function deleteTags($thread_id)
+	{
+		$sql = "DELETE FROM " . AppBase::$tags_threads_table . " WHERE thread_id = '$thread_id'";
+		$this->db->query($sql);
+	}
+
+	public function addTagsToThread($tag_ids, $thread_id)
+	{
+		$this->deleteTags($thread_id);
+		foreach ($tag_ids as $key => $tag_id) {
+			$this->addTagToThread($tag_id, $thread_id);
+		}
+	}
+
+	public function getTagThreadComboExist($tag_id, $thread_id)
+	{
+		$sql = "SELECT id FROM " . AppBase::$tags_threads_table . " WHERE tag_id='$tag_id' AND thread_id='$thread_id'";
+		$result = $this->db->get_var($sql);
+		return $result;
+	}
+
+	public function addTagToThread($tag_id, $thread_id)
+	{
+		$exist = $this->getTagThreadComboExist($tag_id, $thread_id);
+		if (!$exist) {
+			$id = create_guid();
+			$sql = "INSERT INTO " . AppBase::$tags_threads_table . " (id, tag_id, thread_id) VALUES('$id', '$tag_id','$thread_id')";
+			$this->db->query($sql);
+		}
+	}
+
+	function getTagIDByName($tag_name)
+	{
+		$sql = "SELECT id FROM " . AppBase::$tags_table . " WHERE tag_name = '$tag_name'";
+		$result = $this->db->get_var($sql);
+
+		return $result;
+	}
+
+	public function getTagList()
+	{
+		$data = array();
+
+		$sql = "SELECT tag_name, count(distinct(tt.id)) as count
+			FROM " . AppBase::$tags_table . " t
+			LEFT JOIN " . AppBase::$tags_threads_table . " tt
+			ON tt.tag_id=t.id
+			group by t.id order by count DESC";
+
+		$results = $this->db->get_results($sql, ARRAY_A);
+
+		return $results;
+
+	}
+
+	function addTag($tag)
+	{
+		$id = $this->getTagIDByName($tag);
+		if (!$id) {
+			$id = create_guid();
+			$sql = "INSERT INTO " . AppBase::$tags_table . " (tag_name, id) VALUES('$tag','$id')";
+			$this->db->query($sql);
+		}
+		return $id;
 	}
 }
 

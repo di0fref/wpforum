@@ -13,6 +13,7 @@ $text = ForumHelper::input_filter($_REQUEST["text"]);
 $sql = "UPDATE " . AppBase::$posts_table. " SET subject = '$subject', text='$text' WHERE id = '$post_id'";
 
 $wpdb->query($sql);
+ForumHelper::getInstance()->addMessage("Post updated", "success");
 
 $redirect_url = ForumHelper::getLink(AppBase::THREAD_VIEW_ACTION, $thread_id);
 

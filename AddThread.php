@@ -9,6 +9,9 @@ $forum_id = ForumHelper::input_filter($_REQUEST["record"]);
 $subject = ForumHelper::input_filter($_REQUEST["subject"]);
 $text = ForumHelper::input_filter($_REQUEST["text"]);
 
+$tags = explode(",", ForumHelper::input_filter($_REQUEST["tags"]));
+
+
 $is_question = 0;
 if (isset($_REQUEST["is_question"])) {
 	$is_question = ForumHelper::input_filter($_REQUEST["is_question"]);
@@ -61,15 +64,15 @@ $sql_post = "INSERT INTO " . AppBase::$posts_table . "
 		'$date',
 		'$user_id'
 		)";
-/*
-echo "<pre>";
-print_r($sql_thread);
-echo "</pre>";
-echo "<pre>";
-print_r($sql_post);
-echo "</pre>";die;
-*/
+
+foreach ($tags as $key => $tag){
+	$tag_ids[] = ForumHelper::getInstance()->addTag($tag);
+}
+
+ForumHelper::getInstance()->addTagsToThread($tag_ids, $thread_id);
+
 $wpdb->query($sql_thread);
 $wpdb->query($sql_post);
 
+ForumHelper::getInstance()->addMessage("New Topic created", "success");
 $redirect_url = ForumHelper::getLink(AppBase::THREAD_VIEW_ACTION, $thread_id);

@@ -5,14 +5,21 @@ $cats = $fh->getCategories();
 /* Category link */
 $add_category_base = 'admin.php?page=wpforum-add-category';
 $edit_category_base = 'admin.php?page=wpforum-edit-category';
+$delete_category_base = 'admin.php?page=wpforum-delete-category';
+
 $add_category_link = admin_url($add_category_base);
 $edit_category_link = admin_url($edit_category_base);
+$delete_category_link = admin_url($delete_category_base);
 
 /* Forum links */
 $add_forum_base = 'admin.php?page=wpforum-add-forum';
 $edit_forum_base = 'admin.php?page=wpforum-edit-forum';
+$delete_forum_base = 'admin.php?page=wpforum-delete-forum';
+
 $add_forum_link = admin_url($add_forum_base);
 $edit_forum_link = admin_url($edit_forum_base);
+$delete_forum_link = admin_url($delete_forum_base);
+
 
 ?>
 <div class="wrap">
@@ -28,6 +35,7 @@ $edit_forum_link = admin_url($edit_forum_base);
 			<tr>
 				<td>Name</td>
 				<td></td>
+				<td></td>
 				<td>Description</td>
 				<td>Sort Order</td>
 			</tr>
@@ -36,6 +44,8 @@ $edit_forum_link = admin_url($edit_forum_base);
 					<b>Category: <?php echo $cat["name"]; ?></b>
 				</th>
 				<th><a href="<?php echo $edit_category_link;?>&category=<?php echo $cat["id"];?>">Edit</a></th>
+				<th><a class="admin_delete_category" href='#' data-url="<?php echo $delete_category_link;?>&category=<?php echo $cat["id"];?>">Delete</a></th>
+
 				<th>
 					<?php echo $cat["description"]; ?>
 				</th>
@@ -54,6 +64,7 @@ $edit_forum_link = admin_url($edit_forum_base);
 				<tr>
 					<td> -- <?php echo $forum["name"]; ?></td>
 					<td><a href="<?php echo $edit_forum_link;?>&forum=<?php echo $forum["id"];?>">Edit</a></td>
+					<td><a class="admin_delete_thread" href="#" data-url="<?php echo $delete_forum_link;?>&forum=<?php echo $forum["id"];?>">Delete</a></td>
 					<td><?php echo $forum["description"]; ?></td>
 					<td><?php echo $forum["sort_order"]; ?></td>
 				</tr>
